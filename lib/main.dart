@@ -6,7 +6,14 @@ import 'features/auth/presentation/pages/splash_page.dart';
 import 'features/auth/presentation/pages/login_page.dart';
 import 'features/user/presentation/pages/user_home_page.dart';
 import 'features/user/presentation/pages/temple_selection_page.dart';
+import 'features/user/presentation/pages/pooja_booking_page.dart';
+import 'features/user/presentation/pages/darshan_booking_page.dart';
+import 'features/user/presentation/pages/donation_page.dart';
 import 'features/admin/presentation/pages/admin_home_page.dart';
+import 'features/admin/presentation/pages/add_pooja_page.dart';
+import 'features/admin/presentation/pages/add_event_page.dart';
+import 'features/admin/presentation/pages/create_announcement_page.dart';
+import 'features/super_admin/presentation/pages/super_admin_home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,8 +38,19 @@ class TempleApp extends StatelessWidget {
           '/login': (context) => const LoginPage(),
           '/temple-selection': (context) => const TempleSelectionPage(),
           '/user-home': (context) => const UserHomePage(),
+          '/super-admin-home': (context) => const SuperAdminHomePage(),
           '/admin-home': (context) => const AdminHomePage(),
-          '/signup': (context) => const LoginPage(), // Placeholder - signup not implemented
+          '/pooja-booking': (context) {
+            final args = ModalRoute.of(context)?.settings.arguments;
+            final pooja = args is Map<String, dynamic> ? args : <String, dynamic>{};
+            return PoojaBookingPage(pooja: pooja);
+          },
+          '/darshan-booking': (context) => const DarshanBookingPage(),
+          '/donation': (context) => const DonationPage(),
+          '/add-pooja': (context) => const AddPoojaPage(),
+          '/add-event': (context) => const AddEventPage(),
+          '/announcement': (context) => const CreateAnnouncementPage(),
+          '/signup': (context) => const LoginPage(),
         },
       ),
     );

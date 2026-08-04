@@ -23,7 +23,7 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
+  void _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final success = await authProvider.signIn(
@@ -32,7 +32,10 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (success && mounted) {
-        if (authProvider.isAdmin) {
+        // Navigate based on role
+        if (authProvider.isSuperAdmin) {
+          Navigator.pushReplacementNamed(context, '/super-admin-home');
+        } else if (authProvider.isTempleAdmin) {
           Navigator.pushReplacementNamed(context, '/admin-home');
         } else {
           Navigator.pushReplacementNamed(context, '/temple-selection');
@@ -224,7 +227,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         SizedBox(height: 8),
                         Text(
-                          'Enter any email and password (6+ characters) to login.\nUse "admin" in email for admin access.',
+                          'Enter any email and password (6+ characters) to login.\n\n👤 User: any email\n🔧 Admin: include "admin" in email\n⭐ Super Admin: include "superadmin" in email',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey,

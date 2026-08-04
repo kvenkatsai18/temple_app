@@ -225,14 +225,16 @@ class DashboardTab extends StatelessWidget {
           const SizedBox(height: 24),
           const Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildQuickAction(Icons.add_circle, 'Add Pooja'),
-              _buildQuickAction(Icons.event_available, 'Add Event'),
-              _buildQuickAction(Icons.announcement, 'Announce'),
-              _buildQuickAction(Icons.people_alt, 'Add User'),
-            ],
+          Builder(
+            builder: (ctx) => Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildQuickAction(Icons.add_circle, 'Add Pooja', () => Navigator.pushNamed(ctx, '/add-pooja')),
+                _buildQuickAction(Icons.event_available, 'Add Event', () => Navigator.pushNamed(ctx, '/add-event')),
+                _buildQuickAction(Icons.announcement, 'Announce', () => Navigator.pushNamed(ctx, '/announcement')),
+                _buildQuickAction(Icons.people_alt, 'Add User', () {}),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
           const Text('Recent Activities', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -264,9 +266,9 @@ class DashboardTab extends StatelessWidget {
     );
   }
 
-  static Widget _buildQuickAction(IconData icon, String label) {
+  Widget _buildQuickAction(IconData icon, String label, VoidCallback onTap) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       child: Column(
         children: [
           Container(
@@ -320,14 +322,14 @@ class PoojasTab extends StatelessWidget {
                 children: [
                   Text('₹${100 + index * 50}', style: const TextStyle(fontWeight: FontWeight.bold)),
                   const SizedBox(width: 8),
-                  IconButton(icon: const Icon(Icons.edit, size: 20), onPressed: () {}),
+                  IconButton(icon: const Icon(Icons.edit, size: 20), onPressed: () => Navigator.pushNamed(context, '/add-pooja')),
                 ],
               ),
             ),
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(onPressed: () {}, child: const Icon(Icons.add)),
+      floatingActionButton: FloatingActionButton(onPressed: () => Navigator.pushNamed(context, '/add-pooja'), child: const Icon(Icons.add)),
     );
   }
 }
@@ -353,7 +355,7 @@ class EventsTab extends StatelessWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(onPressed: () {}, child: const Icon(Icons.add)),
+      floatingActionButton: FloatingActionButton(onPressed: () => Navigator.pushNamed(context, '/add-event'), child: const Icon(Icons.add)),
     );
   }
 }

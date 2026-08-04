@@ -99,7 +99,7 @@ class HomeTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
-                    onPressed: () {},
+                    onPressed: () => Navigator.pushNamed(context, '/pooja-booking', arguments: {}),
                     icon: const Icon(Icons.calendar_today, size: 16),
                     label: const Text('Book Pooja'),
                     style: ElevatedButton.styleFrom(
@@ -127,9 +127,9 @@ class HomeTab extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildQuickAction(Icons.auto_awesome, 'Book Pooja', () {}),
-                    _buildQuickAction(Icons.visibility, 'Darshan', () {}),
-                    _buildQuickAction(Icons.volunteer_activism, 'Donate', () {}),
+                    _buildQuickAction(Icons.auto_awesome, 'Book Pooja', () => Navigator.pushNamed(context, '/pooja-booking', arguments: {})),
+                    _buildQuickAction(Icons.visibility, 'Darshan', () => Navigator.pushNamed(context, '/darshan-booking')),
+                    _buildQuickAction(Icons.volunteer_activism, 'Donate', () => Navigator.pushNamed(context, '/donation')),
                     _buildQuickAction(Icons.event, 'Events', () {}),
                   ],
                 ),
@@ -382,7 +382,7 @@ class PoojasTab extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () => Navigator.pushNamed(context, '/pooja-booking', arguments: pooja),
                       child: const Text('Book Now'),
                     ),
                   ),
