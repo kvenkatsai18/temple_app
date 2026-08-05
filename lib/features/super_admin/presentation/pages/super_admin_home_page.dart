@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../data/models/temple_model.dart';
+import '../../../../data/services/firebase_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../temple/presentation/providers/temple_provider.dart';
 
 class SuperAdminHomePage extends StatefulWidget {
   const SuperAdminHomePage({super.key});
@@ -11,1448 +15,723 @@ class SuperAdminHomePage extends StatefulWidget {
 }
 
 class _SuperAdminHomePageState extends State<SuperAdminHomePage> {
-  List<Map<String, dynamic>> _temples = [
-    {
-      'id': '1',
-      'name': 'Sri Krishna Temple',
-      'location': 'Mathura, UP',
-      'deity': 'Lord Krishna',
-      'adminName': 'Ramesh Patel',
-      'adminEmail': 'ramesh@temple.com',
-      'usersCount': 1250,
-      'monthlyDonations': 45000,
-      'isActive': true,
-    },
-    {
-      'id': '2',
-      'name': 'Badrinath Temple',
-      'location': 'Badrinath, Uttarakhand',
-      'deity': 'Lord Vishnu',
-      'adminName': 'Suresh Sharma',
-      'adminEmail': 'suresh@temple.com',
-      'usersCount': 2100,
-      'monthlyDonations': 89000,
-      'isActive': true,
-    },
-    {
-      'id': '3',
-      'name': 'Tirumala Temple',
-      'location': 'Tirupati, AP',
-      'deity': 'Lord Venkateswara',
-      'adminName': 'Venkatesh Rao',
-      'adminEmail': 'venkatesh@temple.com',
-      'usersCount': 5200,
-      'monthlyDonations': 250000,
-      'isActive': true,
-    },
-    {
-      'id': '4',
-      'name': 'Somnath Temple',
-      'location': 'Prabhas Patan, Gujarat',
-      'deity': 'Lord Shiva',
-      'adminName': 'Not Assigned',
-      'adminEmail': '',
-      'usersCount': 890,
-      'monthlyDonations': 32000,
-      'isActive': false,
-    },
-  ];
+  int _currentIndex = 0;
 
-  List<Map<String, dynamic>> _templeAdmins = [
-    {'id': '1', 'name': 'Ramesh Patel', 'email': 'ramesh@temple.com', 'temple': 'Sri Krishna Temple', 'status': 'Active'},
-    {'id': '2', 'name': 'Suresh Sharma', 'email': 'suresh@temple.com', 'temple': 'Badrinath Temple', 'status': 'Active'},
-    {'id': '3', 'name': 'Venkatesh Rao', 'email': 'venkatesh@temple.com', 'temple': 'Tirumala Temple', 'status': 'Active'},
-    {'id': '4', 'name': 'Pending...', 'email': 'N/A', 'temple': 'Somnath Temple', 'status': 'Pending'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<TempleProvider>(context, listen: false).loadTemples();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Super Admin Dashboard'),
-        centerTitle: true,
         automaticallyImplyLeading: false,
+        backgroundColor: AppTheme.primaryColor,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              _showNotificationsDialog();
-            },
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.account_circle),
-            onSelected: (value) async {
-              if (value == 'logout') {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Logout'),
-                    content: const Text('Are you sure you want to logout?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx, true),
-                        style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
-                        child: const Text('Logout'),
-                      ),
-                    ],
-                  ),
-                );
-                if (confirmed == true && mounted) {
-                  Provider.of<AuthProvider>(context, listen: false).signOut();
-                  Navigator.pushReplacementNamed(context, '/login');
-                }
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'profile',
-                child: Row(
-                  children: [
-                    Icon(Icons.person, size: 20),
-                    SizedBox(width: 8),
-                    Text('Profile'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'settings',
-                child: Row(
-                  children: [
-                    Icon(Icons.settings, size: 20),
-                    SizedBox(width: 8),
-                    Text('Settings'),
-                  ],
-                ),
-              ),
-              const PopupMenuDivider(),
-              const PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout, size: 20, color: AppTheme.errorColor),
-                    SizedBox(width: 8),
-                    Text('Logout', style: TextStyle(color: AppTheme.errorColor)),
-                  ],
-                ),
-              ),
-            ],
+            icon: const Icon(Icons.refresh),
+            onPressed: () => Provider.of<TempleProvider>(context, listen: false).loadTemples(),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6B46C1), Color(0xFF9F7AEA)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF6B46C1).withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.verified, color: Colors.white, size: 28),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Super Admin',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              'Temple Management Platform',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.analytics, color: Colors.white, size: 16),
-                            SizedBox(width: 4),
-                            Text(
-                              'Platform Owner',
-                              style: TextStyle(color: Colors.white, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Manage temples, admins, and monitor platform performance',
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Stats Cards
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    icon: Icons.temple_hindu,
-                    title: 'Total Temples',
-                    value: '${_temples.length}',
-                    color: AppTheme.primaryColor,
-                    onTap: () => _showAllTemplesDialog(),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    icon: Icons.admin_panel_settings,
-                    title: 'Temple Admins',
-                    value: '${_templeAdmins.where((a) => a['status'] == 'Active').length}',
-                    color: const Color(0xFF6B46C1),
-                    onTap: () => _showAllAdminsDialog(),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    icon: Icons.people,
-                    title: 'Total Users',
-                    value: '${_temples.fold(0, (sum, t) => sum + (t['usersCount'] as int))}',
-                    color: const Color(0xFF38A169),
-                    onTap: () {},
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildStatCard(
-                    icon: Icons.currency_rupee,
-                    title: 'Monthly Revenue',
-                    value: '₹${(_temples.fold(0.0, (sum, t) => sum + (t['monthlyDonations'] as int)).toInt() / 1000).toStringAsFixed(0)}K',
-                    color: AppTheme.accentGold,
-                    onTap: () {},
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Quick Actions
-            const Text(
-              'Quick Actions',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildActionCard(
-                    icon: Icons.add_business,
-                    label: 'Add Temple',
-                    color: AppTheme.primaryColor,
-                    onTap: () => _showAddTempleDialog(),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildActionCard(
-                    icon: Icons.person_add_alt,
-                    label: 'Add Admin',
-                    color: const Color(0xFF6B46C1),
-                    onTap: () => _showAddAdminDialog(),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Temples List
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Temples',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                TextButton.icon(
-                  onPressed: () => _showAllTemplesDialog(),
-                  icon: const Icon(Icons.arrow_forward, size: 16),
-                  label: const Text('View All'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ...List.generate(_temples.length, (index) {
-              final temple = _temples[index];
-              return _buildTempleCard(temple);
-            }),
-            const SizedBox(height: 24),
-
-            // Temple Admins List
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Temple Admins',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                TextButton.icon(
-                  onPressed: () => _showAllAdminsDialog(),
-                  icon: const Icon(Icons.arrow_forward, size: 16),
-                  label: const Text('Manage All'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ...List.generate(_templeAdmins.length, (index) {
-              final admin = _templeAdmins[index];
-              return _buildAdminCard(admin);
-            }),
-            const SizedBox(height: 24),
-          ],
-        ),
+      body: _buildBody(),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        onTap: (index) => setState(() => _currentIndex = index),
+        selectedItemColor: AppTheme.primaryColor,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.temple_hindu), label: 'Temples'),
+          BottomNavigationBarItem(icon: Icon(Icons.admin_panel_settings), label: 'Admins'),
+          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Users'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+        ],
       ),
+      floatingActionButton: _buildFAB(),
     );
   }
 
-  Widget _buildStatCard({
-    required IconData icon,
-    required String title,
-    required String value,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  Widget? _buildFAB() {
+    switch (_currentIndex) {
+      case 1:
+        return FloatingActionButton.extended(
+          onPressed: () => _showAddTempleDialog(context),
+          icon: const Icon(Icons.add),
+          label: const Text('Add Temple'),
+          backgroundColor: AppTheme.primaryColor,
+        );
+      case 2:
+        return FloatingActionButton.extended(
+          onPressed: () => _showAddAdminDialog(context),
+          icon: const Icon(Icons.person_add),
+          label: const Text('Add Admin'),
+          backgroundColor: AppTheme.primaryColor,
+        );
+      default:
+        return null;
+    }
   }
 
-  Widget _buildActionCard({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  Widget _buildBody() {
+    switch (_currentIndex) {
+      case 0:
+        return DashboardTab(onTabSwitch: (index) => setState(() => _currentIndex = index));
+      case 1:
+        return const TemplesTab();
+      case 2:
+        return const AdminsTab();
+      case 3:
+        return const UsersTab();
+      case 4:
+        return const ProfileTab();
+      default:
+        return const SizedBox();
+    }
   }
 
-  Widget _buildTempleCard(Map<String, dynamic> temple) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryLight.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.temple_hindu, color: AppTheme.primaryColor),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        temple['name'] as String,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Icon(Icons.location_on, size: 14, color: Colors.grey[500]),
-                          const SizedBox(width: 2),
-                          Text(
-                            temple['location'] as String,
-                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: temple['isActive'] 
-                        ? AppTheme.successColor.withValues(alpha: 0.1)
-                        : Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    temple['isActive'] ? 'Active' : 'Pending',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: temple['isActive'] ? AppTheme.successColor : Colors.orange,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _buildTempleStat(Icons.people, '${temple['usersCount']} users'),
-                const SizedBox(width: 16),
-                _buildTempleStat(Icons.currency_rupee, '₹${temple['monthlyDonations']}/mo'),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showEditTempleDialog(temple),
-                    icon: const Icon(Icons.edit, size: 16),
-                    label: const Text('Edit'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showManageAdminDialog(temple),
-                    icon: const Icon(Icons.manage_accounts, size: 16),
-                    label: const Text('Admin'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: () => _showDeleteTempleDialog(temple),
-                  icon: const Icon(Icons.delete_outline, color: AppTheme.errorColor),
-                  tooltip: 'Delete Temple',
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTempleStat(IconData icon, String value) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: Colors.grey[500]),
-        const SizedBox(width: 4),
-        Text(
-          value,
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAdminCard(Map<String, dynamic> admin) {
-    final isPending = admin['status'] == 'Pending';
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: isPending ? Colors.orange.withValues(alpha: 0.2) : AppTheme.primaryColor.withValues(alpha: 0.2),
-          child: Icon(
-            isPending ? Icons.hourglass_empty : Icons.person,
-            color: isPending ? Colors.orange : AppTheme.primaryColor,
-          ),
-        ),
-        title: Text(
-          admin['name'] as String,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              admin['temple'] as String,
-              style: const TextStyle(fontSize: 12),
-            ),
-            if (!isPending)
-              Text(
-                admin['email'] as String,
-                style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-              ),
-          ],
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: admin['status'] == 'Active' 
-                    ? AppTheme.successColor.withValues(alpha: 0.1)
-                    : Colors.orange.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                admin['status'] as String,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: admin['status'] == 'Active' ? AppTheme.successColor : Colors.orange,
-                ),
-              ),
-            ),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, size: 20),
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _showEditAdminDialog(admin);
-                } else if (value == 'delete') {
-                  _showDeleteAdminDialog(admin);
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 18),
-                      SizedBox(width: 8),
-                      Text('Edit'),
-                    ],
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 18, color: AppTheme.errorColor),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: AppTheme.errorColor)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showAddTempleDialog() {
+  void _showAddTempleDialog(BuildContext context) {
     final nameController = TextEditingController();
     final locationController = TextEditingController();
     final deityController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.add_business, color: AppTheme.primaryColor),
-            SizedBox(width: 8),
-            Text('Onboard New Temple'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Temple Name *',
-                  prefixIcon: Icon(Icons.temple_hindu),
-                  hintText: 'Enter temple name',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: locationController,
-                decoration: const InputDecoration(
-                  labelText: 'Location *',
-                  prefixIcon: Icon(Icons.location_on),
-                  hintText: 'Enter location',
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: deityController,
-                decoration: const InputDecoration(
-                  labelText: 'Main Deity',
-                  prefixIcon: Icon(Icons.auto_awesome),
-                  hintText: 'e.g., Lord Shiva',
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              if (nameController.text.isEmpty || locationController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please fill in required fields'),
-                    backgroundColor: AppTheme.errorColor,
-                  ),
-                );
-                return;
-              }
-              
-              final newTemple = {
-                'id': DateTime.now().millisecondsSinceEpoch.toString(),
-                'name': nameController.text,
-                'location': locationController.text,
-                'deity': deityController.text.isEmpty ? 'General' : deityController.text,
-                'adminName': 'Not Assigned',
-                'adminEmail': '',
-                'usersCount': 0,
-                'monthlyDonations': 0,
-                'isActive': false,
-              };
-              
-              setState(() {
-                _temples.add(newTemple);
-              });
-              
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('✅ Temple "${nameController.text}" has been onboarded!'),
-                  backgroundColor: AppTheme.successColor,
-                ),
-              );
-            },
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('Add Temple'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showEditTempleDialog(Map<String, dynamic> temple) {
-    final nameController = TextEditingController(text: temple['name'] as String);
-    final locationController = TextEditingController(text: temple['location'] as String);
-    final deityController = TextEditingController(text: temple['deity'] as String);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.edit, color: AppTheme.primaryColor),
-            const SizedBox(width: 8),
-            Text('Edit ${temple['name']}'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Temple Name *',
-                  prefixIcon: Icon(Icons.temple_hindu),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: locationController,
-                decoration: const InputDecoration(
-                  labelText: 'Location *',
-                  prefixIcon: Icon(Icons.location_on),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: deityController,
-                decoration: const InputDecoration(
-                  labelText: 'Main Deity',
-                  prefixIcon: Icon(Icons.auto_awesome),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              if (nameController.text.isEmpty || locationController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please fill in required fields'),
-                    backgroundColor: AppTheme.errorColor,
-                  ),
-                );
-                return;
-              }
-              
-              setState(() {
-                final index = _temples.indexOf(temple);
-                if (index != -1) {
-                  _temples[index]['name'] = nameController.text;
-                  _temples[index]['location'] = locationController.text;
-                  _temples[index]['deity'] = deityController.text;
-                }
-              });
-              
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('✅ Temple "${nameController.text}" updated successfully!'),
-                  backgroundColor: AppTheme.successColor,
-                ),
-              );
-            },
-            icon: const Icon(Icons.save, size: 18),
-            label: const Text('Save Changes'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteTempleDialog(Map<String, dynamic> temple) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning, color: AppTheme.errorColor),
-            SizedBox(width: 8),
-            Text('Delete Temple'),
-          ],
-        ),
-        content: Text('Are you sure you want to delete "${temple['name']}"? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              setState(() {
-                _temples.remove(temple);
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('🗑️ Temple "${temple['name']}" deleted'),
-                  backgroundColor: AppTheme.errorColor,
-                ),
-              );
-            },
-            icon: const Icon(Icons.delete, size: 18),
-            label: const Text('Delete'),
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showManageAdminDialog(Map<String, dynamic> temple) {
-    final nameController = TextEditingController();
-    final emailController = TextEditingController();
+    final addressController = TextEditingController();
     final phoneController = TextEditingController();
-    
-    final hasAdmin = (temple['adminName'] as String) != 'Not Assigned';
+    final emailController = TextEditingController();
+    final descriptionController = TextEditingController();
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.manage_accounts, color: Color(0xFF6B46C1)),
-            const SizedBox(width: 8),
-            Expanded(child: Text('Manage Admin - ${temple['name']}')),
-          ],
-        ),
+        title: const Text('Add New Temple'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (hasAdmin) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppTheme.successColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.check_circle, color: AppTheme.successColor, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Current Admin',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                            Text(
-                              temple['adminName'] as String,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              temple['adminEmail'] as String,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Temple Name *')),
+              TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location *')),
+              TextField(controller: deityController, decoration: const InputDecoration(labelText: 'Deity')),
+              TextField(controller: addressController, decoration: const InputDecoration(labelText: 'Address')),
+              TextField(controller: phoneController, decoration: const InputDecoration(labelText: 'Phone'), keyboardType: TextInputType.phone),
+              TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email'), keyboardType: TextInputType.emailAddress),
+              TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Description'), maxLines: 2),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (nameController.text.isEmpty || locationController.text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill required fields')));
+                return;
+              }
+              try {
+                final temple = TempleModel(
+                  id: '', name: nameController.text, location: locationController.text,
+                  deity: deityController.text.isEmpty ? null : deityController.text,
+                  address: addressController.text.isEmpty ? null : addressController.text,
+                  phone: phoneController.text.isEmpty ? null : phoneController.text,
+                  email: emailController.text.isEmpty ? null : emailController.text,
+                  description: descriptionController.text.isEmpty ? null : descriptionController.text, isActive: true,
+                );
+                await FirebaseService.addTemple(temple.toFirestore());
+                if (context.mounted) {
+                  Provider.of<TempleProvider>(context, listen: false).loadTemples();
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Temple added successfully!')));
+                }
+              } catch (e) {
+                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddAdminDialog(BuildContext context) {
+    final emailController = TextEditingController();
+    final nameController = TextEditingController();
+    String? selectedTempleId;
+    final temples = Provider.of<TempleProvider>(context, listen: false).temples;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Add Temple Admin'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('Enter the email of an existing user to promote them to Admin', style: TextStyle(fontSize: 12, color: Colors.grey)),
                 const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 8),
-                const Text(
-                  'Replace Admin',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
+                TextField(controller: emailController, decoration: const InputDecoration(labelText: 'User Email *', hintText: 'user@example.com'), keyboardType: TextInputType.emailAddress),
                 const SizedBox(height: 12),
-              ] else ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.warning, color: Colors.orange, size: 20),
-                      SizedBox(width: 8),
-                      Text(
-                        'No admin assigned to this temple',
-                        style: TextStyle(fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-                ),
+                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Admin Display Name *')),
                 const SizedBox(height: 16),
-                const Text(
-                  'Create New Admin',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                DropdownButtonFormField<String>(
+                  value: selectedTempleId,
+                  decoration: const InputDecoration(labelText: 'Select Temple *'),
+                  items: temples.map((temple) => DropdownMenuItem(value: temple.id, child: Text(temple.name, overflow: TextOverflow.ellipsis))).toList(),
+                  onChanged: (value) => setDialogState(() => selectedTempleId = value),
                 ),
-                const SizedBox(height: 12),
               ],
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Admin Name *',
-                  prefixIcon: Icon(Icons.person),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email *',
-                  prefixIcon: Icon(Icons.email),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Phone',
-                  prefixIcon: Icon(Icons.phone),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              if (nameController.text.isEmpty || emailController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please fill in required fields'),
-                    backgroundColor: AppTheme.errorColor,
-                  ),
-                );
-                return;
-              }
-              
-              setState(() {
-                final index = _temples.indexOf(temple);
-                if (index != -1) {
-                  _temples[index]['adminName'] = nameController.text;
-                  _temples[index]['adminEmail'] = emailController.text;
-                  _temples[index]['isActive'] = true;
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                if (emailController.text.isEmpty || nameController.text.isEmpty || selectedTempleId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all fields')));
+                  return;
                 }
-                
-                // Update or add admin to admins list
-                final existingAdminIndex = _templeAdmins.indexWhere(
-                  (a) => a['temple'] == temple['name']
-                );
-                if (existingAdminIndex != -1) {
-                  _templeAdmins[existingAdminIndex]['name'] = nameController.text;
-                  _templeAdmins[existingAdminIndex]['email'] = emailController.text;
-                  _templeAdmins[existingAdminIndex]['status'] = 'Active';
-                } else {
-                  _templeAdmins.add({
-                    'id': DateTime.now().millisecondsSinceEpoch.toString(),
-                    'name': nameController.text,
-                    'email': emailController.text,
-                    'temple': temple['name'],
-                    'status': 'Active',
-                  });
-                }
-              });
-              
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('✅ Admin "${nameController.text}" assigned to ${temple['name']}!'),
-                  backgroundColor: AppTheme.successColor,
-                ),
-              );
-            },
-            icon: const Icon(Icons.person_add, size: 18),
-            label: Text(hasAdmin ? 'Update Admin' : 'Assign Admin'),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6B46C1)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddAdminDialog() {
-    final nameController = TextEditingController();
-    final emailController = TextEditingController();
-    final phoneController = TextEditingController();
-    String? selectedTemple;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.person_add_alt, color: Color(0xFF6B46C1)),
-            SizedBox(width: 8),
-            Text('Create Temple Admin'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Admin Name *',
-                  prefixIcon: Icon(Icons.person),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email *',
-                  prefixIcon: Icon(Icons.email),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Phone',
-                  prefixIcon: Icon(Icons.phone),
-                ),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: selectedTemple,
-                decoration: const InputDecoration(
-                  labelText: 'Assign Temple *',
-                  prefixIcon: Icon(Icons.temple_hindu),
-                ),
-                items: _temples.map((temple) {
-                  return DropdownMenuItem(
-                    value: temple['id'] as String,
-                    child: Text(temple['name'] as String),
+                try {
+                  final templeName = temples.firstWhere((t) => t.id == selectedTempleId).name;
+                  final email = emailController.text.toLowerCase();
+                  
+                  print('🔍 DEBUG SUPER ADMIN: Adding admin with email=$email');
+                  
+                  // 1. First, check if user already exists in users collection
+                  final existingUsers = await FirebaseFirestore.instance
+                      .collection('users')
+                      .where('email', isEqualTo: email)
+                      .get();
+                  
+                  print('🔍 DEBUG SUPER ADMIN: Found ${existingUsers.docs.length} existing users');
+                  
+                  if (existingUsers.docs.isNotEmpty) {
+                    // User exists - update their role to temple_admin
+                    await existingUsers.docs.first.reference.update({
+                      'role': 'temple_admin',
+                      'templeId': selectedTempleId,
+                      'templeName': templeName,
+                    });
+                    print('🔍 DEBUG SUPER ADMIN: Updated existing user to temple_admin');
+                  }
+                  
+                  // 2. Use FirebaseService.addAdmin to create admin record
+                  final adminId = await FirebaseService.addAdmin(
+                    email,
+                    nameController.text,
+                    selectedTempleId!,
+                    templeName,
                   );
-                }).toList(),
-                onChanged: (value) {
-                  selectedTemple = value;
-                },
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              if (nameController.text.isEmpty || emailController.text.isEmpty || selectedTemple == null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please fill in all required fields'),
-                    backgroundColor: AppTheme.errorColor,
-                  ),
-                );
-                return;
-              }
-              
-              final temple = _temples.firstWhere((t) => t['id'] == selectedTemple);
-              
-              setState(() {
-                _templeAdmins.add({
-                  'id': DateTime.now().millisecondsSinceEpoch.toString(),
-                  'name': nameController.text,
-                  'email': emailController.text,
-                  'temple': temple['name'],
-                  'status': 'Active',
-                });
-                
-                final templeIndex = _temples.indexOf(temple);
-                if (templeIndex != -1) {
-                  _temples[templeIndex]['adminName'] = nameController.text;
-                  _temples[templeIndex]['adminEmail'] = emailController.text;
-                  _temples[templeIndex]['isActive'] = true;
+                  print('🔍 DEBUG SUPER ADMIN: Created admin in admins collection with id=$adminId');
+                  
+                  // 3. Also update temple with admin info
+                  await FirebaseFirestore.instance.collection('temples').doc(selectedTempleId).update({
+                    'adminId': adminId,
+                    'adminName': nameController.text,
+                    'adminEmail': email,
+                  });
+                  print('🔍 DEBUG SUPER ADMIN: Updated temple with admin info');
+                  
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text('Admin added! They will go to ${templeName} Admin Dashboard when they sign in.'))
+                    );
+                    setState(() {}); // Refresh
+                  }
+                } catch (e) {
+                  print('🔍 DEBUG SUPER ADMIN ERROR: $e');
+                  if (dialogContext.mounted) ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text('Error: $e')));
                 }
-              });
-              
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('✅ Admin "${nameController.text}" created for ${temple['name']}!'),
-                  backgroundColor: AppTheme.successColor,
+              },
+              child: const Text('Add Admin'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class DashboardTab extends StatefulWidget {
+  final Function(int) onTabSwitch;
+  
+  const DashboardTab({super.key, required this.onTabSwitch});
+
+  @override
+  State<DashboardTab> createState() => _DashboardTabState();
+}
+
+class _DashboardTabState extends State<DashboardTab> {
+  int _totalAdmins = 0;
+  int _totalUsers = 0;
+  int _totalBookings = 0;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      // Get total admins count
+      final adminsSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'temple_admin')
+          .get();
+      
+      // Get total users count
+      final usersSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'user')
+          .get();
+      
+      // Get total bookings count (across all temples)
+      final bookingsSnapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .get();
+      
+      if (mounted) {
+        setState(() {
+          _totalAdmins = adminsSnapshot.size;
+          _totalUsers = usersSnapshot.size;
+          _totalBookings = bookingsSnapshot.size;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _loadStats,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Consumer<AuthProvider>(
+              builder: (context, auth, child) => Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(gradient: AppTheme.primaryGradient, borderRadius: BorderRadius.circular(16)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('🙏 Welcome, Super Admin!', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const SizedBox(height: 8),
+                    Text(auth.currentUser?.email ?? '', style: const TextStyle(fontSize: 14, color: Colors.white70)),
+                  ],
                 ),
-              );
-            },
-            icon: const Icon(Icons.person_add, size: 18),
-            label: const Text('Create Admin'),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6B46C1)),
-          ),
-        ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text('Quick Overview', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Consumer<TempleProvider>(
+              builder: (context, provider, child) => _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 12,
+                      crossAxisSpacing: 12,
+                      childAspectRatio: 1.3,
+                      children: [
+                        _buildStatCard('Total Temples', '${provider.temples.length}', Icons.temple_hindu, AppTheme.primaryColor),
+                        _buildStatCard('Active Admins', '$_totalAdmins', Icons.admin_panel_settings, AppTheme.accentGold),
+                        _buildStatCard('Total Users', '$_totalUsers', Icons.people, AppTheme.successColor),
+                        _buildStatCard('Total Bookings', '$_totalBookings', Icons.calendar_today, AppTheme.accentRed),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 24),
+            const Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1.5,
+              children: [
+                _buildActionCard(context, 'Add Temple', Icons.add_business, () => widget.onTabSwitch(1)),
+                _buildActionCard(context, 'Add Admin', Icons.person_add, () => widget.onTabSwitch(2)),
+                _buildActionCard(context, 'View Reports', Icons.analytics, () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Reports feature coming soon!'))
+                  );
+                }),
+                _buildActionCard(context, 'Settings', Icons.settings, () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Settings feature coming soon!'))
+                  );
+                }),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  void _showEditAdminDialog(Map<String, dynamic> admin) {
-    final nameController = TextEditingController(text: admin['name'] as String);
-    final emailController = TextEditingController(text: admin['email'] as String);
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.edit, color: Color(0xFF6B46C1)),
-            SizedBox(width: 8),
-            Text('Edit Admin'),
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 8),
+            Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+            const SizedBox(height: 4),
+            Text(title, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
           ],
         ),
-        content: SingleChildScrollView(
+      ),
+    );
+  }
+
+  Widget _buildActionCard(BuildContext context, String title, IconData icon, VoidCallback onTap) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Admin Name *',
-                  prefixIcon: Icon(Icons.person),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email *',
-                  prefixIcon: Icon(Icons.email),
-                ),
-              ),
+              Icon(icon, color: AppTheme.primaryColor, size: 28),
+              const SizedBox(height: 8),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12), textAlign: TextAlign.center),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class TemplesTab extends StatelessWidget {
+  const TemplesTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<TempleProvider>(
+      builder: (context, provider, child) {
+        if (provider.isLoading) return const Center(child: CircularProgressIndicator());
+        if (provider.temples.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.temple_hindu, size: 80, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                const Text('No Temples Added', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('Tap the + button to add temples', style: TextStyle(color: Colors.grey[600])),
+              ],
+            ),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: provider.temples.length,
+          itemBuilder: (context, index) {
+            final temple = provider.temples[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: AppTheme.primaryLight.withValues(alpha: 0.2), shape: BoxShape.circle),
+                  child: const Icon(Icons.temple_hindu, color: AppTheme.primaryColor),
+                ),
+                title: Text(temple.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(temple.location),
+                    if (temple.deity != null && temple.deity!.isNotEmpty) Text(temple.deity!, style: const TextStyle(color: AppTheme.accentGold)),
+                  ],
+                ),
+                trailing: PopupMenuButton<String>(
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit, size: 20), SizedBox(width: 8), Text('Edit')])),
+                    const PopupMenuItem(value: 'admins', child: Row(children: [Icon(Icons.admin_panel_settings, size: 20), SizedBox(width: 8), Text('Manage Admins')])),
+                    const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete, size: 20, color: Colors.red), SizedBox(width: 8), Text('Delete', style: TextStyle(color: Colors.red))])),
+                  ],
+                  onSelected: (value) {
+                    if (value == 'delete') _showDeleteConfirmation(context, temple);
+                  },
+                ),
+                isThreeLine: true,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirmation(BuildContext context, TempleModel temple) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Temple'),
+        content: Text('Are you sure you want to delete "${temple.name}"?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              if (nameController.text.isEmpty || emailController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please fill in required fields'),
-                    backgroundColor: AppTheme.errorColor,
-                  ),
-                );
-                return;
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              await Provider.of<TempleProvider>(context, listen: false).deleteTemple(temple.id);
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Temple deleted')));
               }
-              
-              setState(() {
-                final index = _templeAdmins.indexOf(admin);
-                if (index != -1) {
-                  _templeAdmins[index]['name'] = nameController.text;
-                  _templeAdmins[index]['email'] = emailController.text;
-                }
-              });
-              
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('✅ Admin updated successfully!'),
-                  backgroundColor: AppTheme.successColor,
-                ),
-              );
             },
-            icon: const Icon(Icons.save, size: 18),
-            label: const Text('Save Changes'),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6B46C1)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteAdminDialog(Map<String, dynamic> admin) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning, color: AppTheme.errorColor),
-            SizedBox(width: 8),
-            Text('Delete Admin'),
-          ],
-        ),
-        content: Text('Are you sure you want to delete admin "${admin['name']}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              setState(() {
-                _templeAdmins.remove(admin);
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('🗑️ Admin "${admin['name']}" deleted'),
-                  backgroundColor: AppTheme.errorColor,
-                ),
-              );
-            },
-            icon: const Icon(Icons.delete, size: 18),
-            label: const Text('Delete'),
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
   }
+}
 
-  void _showAllTemplesDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.temple_hindu, color: AppTheme.primaryColor),
-            SizedBox(width: 8),
-            Text('All Temples'),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: _temples.length,
-            itemBuilder: (context, index) {
-              final temple = _temples[index];
-              return ListTile(
+class AdminsTab extends StatelessWidget {
+  const AdminsTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').where('role', isEqualTo: 'temple_admin').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        
+        final admins = snapshot.data?.docs ?? [];
+        
+        if (admins.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.admin_panel_settings, size: 80, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                const Text('No Admins Yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('Tap the + button to add admins', style: TextStyle(color: Colors.grey[600])),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: admins.length,
+          itemBuilder: (context, index) {
+            final admin = admins[index];
+            final data = admin.data() as Map<String, dynamic>;
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: AppTheme.primaryLight.withValues(alpha: 0.2),
-                  child: const Icon(Icons.temple_hindu, color: AppTheme.primaryColor, size: 20),
-                ),
-                title: Text(temple['name'] as String),
-                subtitle: Text(temple['location'] as String),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: temple['isActive'] 
-                        ? AppTheme.successColor.withValues(alpha: 0.1)
-                        : Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    temple['isActive'] ? 'Active' : 'Pending',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: temple['isActive'] ? AppTheme.successColor : Colors.orange,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAllAdminsDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.admin_panel_settings, color: Color(0xFF6B46C1)),
-            SizedBox(width: 8),
-            Text('All Temple Admins'),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: _templeAdmins.length,
-            itemBuilder: (context, index) {
-              final admin = _templeAdmins[index];
-              final isPending = admin['status'] == 'Pending';
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: isPending 
-                      ? Colors.orange.withValues(alpha: 0.2)
-                      : const Color(0xFF6B46C1).withValues(alpha: 0.2),
-                  child: Icon(
-                    isPending ? Icons.hourglass_empty : Icons.person,
-                    color: isPending ? Colors.orange : const Color(0xFF6B46C1),
-                    size: 20,
-                  ),
-                ),
-                title: Text(admin['name'] as String),
-                subtitle: Text('${admin['temple']} • ${admin['email']}'),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: admin['status'] == 'Active' 
-                        ? AppTheme.successColor.withValues(alpha: 0.1)
-                        : Colors.orange.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    admin['status'] as String,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: admin['status'] == 'Active' ? AppTheme.successColor : Colors.orange,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showNotificationsDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.notifications, color: AppTheme.primaryColor),
-            SizedBox(width: 8),
-            Text('Notifications'),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFF38A169),
-                  child: Icon(Icons.person_add, color: Colors.white, size: 20),
-                ),
-                title: const Text('New Admin Created'),
-                subtitle: const Text('Venkatesh Rao → Tirumala'),
-                trailing: const Text('2h ago', style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ),
-              const Divider(),
-              ListTile(
-                leading: const CircleAvatar(
                   backgroundColor: AppTheme.primaryColor,
-                  child: Icon(Icons.temple_hindu, color: Colors.white, size: 20),
+                  child: Text((data['name'] ?? 'A')[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
                 ),
-                title: const Text('New Temple Onboarded'),
-                subtitle: const Text('Somnath Temple added'),
-                trailing: const Text('1d ago', style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ),
-              const Divider(),
-              ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: AppTheme.accentGold,
-                  child: Icon(Icons.currency_rupee, color: Colors.white, size: 20),
+                title: Text(data['name'] ?? 'Admin', style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(data['email'] ?? ''),
+                trailing: IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () => _showDeleteAdminConfirmation(context, admin.id, data['name'] ?? 'Admin'),
                 ),
-                title: const Text('Revenue Milestone'),
-                subtitle: const Text('Donations crossed ₹4L!'),
-                trailing: const Text('3d ago', style: TextStyle(color: Colors.grey, fontSize: 12)),
               ),
-            ],
-          ),
-        ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDeleteAdminConfirmation(BuildContext context, String adminId, String adminName) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Admin'),
+        content: Text('Are you sure you want to delete admin "$adminName"?'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              await FirebaseFirestore.instance.collection('users').doc(adminId).delete();
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Admin deleted')));
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class UsersTab extends StatelessWidget {
+  const UsersTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('users').where('role', isEqualTo: 'user').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        
+        final users = snapshot.data?.docs ?? [];
+        
+        if (users.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.people, size: 80, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                const Text('No Users Yet', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text('Users will appear here once they register', style: TextStyle(color: Colors.grey[600])),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: users.length,
+          itemBuilder: (context, index) {
+            final user = users[index];
+            final data = user.data() as Map<String, dynamic>;
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppTheme.successColor,
+                  child: Text((data['name'] ?? 'U')[0].toUpperCase(), style: const TextStyle(color: Colors.white)),
+                ),
+                title: Text(data['name'] ?? 'User', style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text(data['email'] ?? ''),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class ProfileTab extends StatelessWidget {
+  const ProfileTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Consumer<AuthProvider>(
+            builder: (context, auth, child) => Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: AppTheme.primaryColor,
+                      child: Text(
+                        (auth.currentUser?.displayName?.isNotEmpty ?? false) 
+                            ? auth.currentUser!.displayName![0].toUpperCase() 
+                            : 'S',
+                        style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(auth.currentUser?.displayName ?? 'Super Admin', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    Text(auth.currentUser?.email ?? '', style: TextStyle(color: Colors.grey[600])),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(color: AppTheme.accentGold.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+                      child: const Text('Super Admin', style: TextStyle(color: AppTheme.accentGold, fontWeight: FontWeight.w500)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.settings, color: AppTheme.primaryColor),
+                  title: const Text('Settings'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.help, color: AppTheme.primaryColor),
+                  title: const Text('Help & Support'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.info, color: AppTheme.primaryColor),
+                  title: const Text('About'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                final auth = Provider.of<AuthProvider>(context, listen: false);
+                await auth.signOut();
+                if (context.mounted) Navigator.pushReplacementNamed(context, '/login');
+              },
+              icon: const Icon(Icons.logout),
+              label: const Text('Logout'),
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor, padding: const EdgeInsets.symmetric(vertical: 12)),
+            ),
           ),
         ],
       ),

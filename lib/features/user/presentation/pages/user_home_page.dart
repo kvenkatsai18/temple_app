@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../data/services/firebase_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../temple/presentation/providers/temple_provider.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -12,14 +14,54 @@ class UserHomePage extends StatefulWidget {
 
 class _UserHomePageState extends State<UserHomePage> {
   int _currentIndex = 0;
+  List<Map<String, dynamic>> _poojas = [];
+  List<Map<String, dynamic>> _events = [];
+  List<Map<String, dynamic>> _announcements = [];
+  bool _isLoading = true;
 
-  final List<Widget> _pages = [
-    const HomeTab(),
-    const PoojasTab(),
-    const DarshanTab(),
-    const DonationsTab(),
-    const ProfileTab(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    
+    final templeProvider = Provider.of<TempleProvider>(context, listen: false);
+    final templeId = templeProvider.selectedTempleId;
+    
+    if (templeId != null) {
+      try {
+        final poojasData = await FirebaseService.getPoojasByTempleAsMaps(templeId);
+        final eventsData = await FirebaseService.getEventsByTempleAsMaps(templeId);
+        final announcementsData = await FirebaseService.getAnnouncementsByTempleAsMaps(templeId);
+        
+        if (mounted) {
+          setState(() {
+            _poojas = poojasData;
+            _events = eventsData;
+            _announcements = announcementsData;
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _refreshData() {
+    _loadData();
+  }
+
+  final List<Widget> _pages = [];
 
   @override
   Widget build(BuildContext context) {
@@ -36,12 +78,12 @@ class _UserHomePageState extends State<UserHomePage> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshData,
           ),
         ],
       ),
-      body: _pages[_currentIndex],
+      body: _buildBody(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
@@ -55,175 +97,211 @@ class _UserHomePageState extends State<UserHomePage> {
       ),
     );
   }
+
+  Widget _buildBody() {
+    switch (_currentIndex) {
+      case 0:
+        return HomeTab(
+          poojas: _poojas,
+          events: _events,
+          announcements: _announcements,
+          isLoading: _isLoading,
+          onRefresh: _refreshData,
+        );
+      case 1:
+        return PoojasTab(poojas: _poojas, isLoading: _isLoading);
+      case 2:
+        return const DarshanTab();
+      case 3:
+        return const DonationsTab();
+      case 4:
+        return const ProfileTab();
+      default:
+        return const SizedBox();
+    }
+  }
 }
 
 class HomeTab extends StatelessWidget {
-  const HomeTab({super.key});
+  final List<Map<String, dynamic>> poojas;
+  final List<Map<String, dynamic>> events;
+  final List<Map<String, dynamic>> announcements;
+  final bool isLoading;
+  final VoidCallback onRefresh;
+
+  const HomeTab({
+    super.key,
+    required this.poojas,
+    required this.events,
+    required this.announcements,
+    required this.isLoading,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Banner
-          Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: AppTheme.primaryGradient,
+    return RefreshIndicator(
+      onRefresh: () async => onRefresh(),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Banner
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Consumer<AuthProvider>(
+                      builder: (context, auth, child) {
+                        return Text(
+                          '🙏 Jai Sri Krishna, ${auth.currentUser?.displayName ?? "Devotee"}!',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Welcome to the Divine Temple',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.pushNamed(context, '/pooja-booking', arguments: {}),
+                      icon: const Icon(Icons.calendar_today, size: 16),
+                      label: const Text('Book Pooja'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: AppTheme.primaryColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
+            
+            // Quick Actions
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Consumer<AuthProvider>(
-                    builder: (context, auth, child) {
-                      return Text(
-                        '🙏 Jai Sri Krishna, ${auth.currentUser?.name ?? "Devotee"}!',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
                   const Text(
-                    'Welcome to the Divine Temple',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white70,
-                    ),
+                    'Quick Actions',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: () => Navigator.pushNamed(context, '/pooja-booking', arguments: {}),
-                    icon: const Icon(Icons.calendar_today, size: 16),
-                    label: const Text('Book Pooja'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: AppTheme.primaryColor,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildQuickAction(Icons.auto_awesome, 'Book Pooja', () => Navigator.pushNamed(context, '/pooja-booking', arguments: {})),
+                      _buildQuickAction(Icons.visibility, 'Darshan', () => Navigator.pushNamed(context, '/darshan-booking')),
+                      _buildQuickAction(Icons.volunteer_activism, 'Donate', () => Navigator.pushNamed(context, '/donation')),
+                      _buildQuickAction(Icons.event, 'Events', () {}),
+                    ],
                   ),
-                  const SizedBox(height: 20),
                 ],
               ),
             ),
-          ),
-          // Quick Actions
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Quick Actions',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+            
+            // Today's Pooja Schedule
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Today's Poojas",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  if (isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (poojas.isEmpty)
+                    _buildEmptyState('No poojas available today', Icons.auto_awesome)
+                  else
+                    ...poojas.take(4).map((pooja) => _buildScheduleCard(
+                      pooja['name'] ?? 'Pooja',
+                      pooja['timing'] ?? '',
+                      Icons.wb_sunny,
+                    )),
+                ],
+              ),
+            ),
+            
+            // Announcements
+            if (announcements.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildQuickAction(Icons.auto_awesome, 'Book Pooja', () => Navigator.pushNamed(context, '/pooja-booking', arguments: {})),
-                    _buildQuickAction(Icons.visibility, 'Darshan', () => Navigator.pushNamed(context, '/darshan-booking')),
-                    _buildQuickAction(Icons.volunteer_activism, 'Donate', () => Navigator.pushNamed(context, '/donation')),
-                    _buildQuickAction(Icons.event, 'Events', () {}),
+                    const Text(
+                      'Announcements',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 12),
+                    ...announcements.map((announcement) => _buildAnnouncementCard(
+                      announcement['title'] ?? 'Announcement',
+                      announcement['message'] ?? '',
+                    )),
                   ],
                 ),
-              ],
-            ),
-          ),
-          // Today's Schedule
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Today's Schedule",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                _buildScheduleCard('Suprabhatha Seva', '5:00 AM - 6:00 AM', Icons.wb_sunny),
-                _buildScheduleCard('Morning Pooja', '6:00 AM - 7:30 AM', Icons.auto_awesome),
-                _buildScheduleCard('Archana', '8:00 AM - 12:00 PM', Icons.star),
-                _buildScheduleCard('Evening Pooja', '6:00 PM - 7:00 PM', Icons.nightlight),
-              ],
-            ),
-          ),
-          // Announcements
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Announcements',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppTheme.warningColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.3)),
+              ),
+            ],
+            
+            // Upcoming Events
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Upcoming Events',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  child: const Row(
-                    children: [
-                      Icon(Icons.campaign, color: AppTheme.warningColor),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Ganesh Chaturthi',
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              'Special poojas and celebrations from Sept 7-17',
-                              style: TextStyle(fontSize: 12, color: Colors.grey),
-                            ),
-                          ],
-                        ),
+                  const SizedBox(height: 12),
+                  if (isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (events.isEmpty)
+                    _buildEmptyState('No upcoming events', Icons.event)
+                  else
+                    SizedBox(
+                      height: 140,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: events.length,
+                        itemBuilder: (context, index) {
+                          final event = events[index];
+                          return _buildEventCard(
+                            event['name'] ?? 'Event',
+                            event['date'] ?? '',
+                            AppTheme.primaryColor,
+                          );
+                        },
                       ),
-                    ],
-                  ),
-                ),
-              ],
+                    ),
+                ],
+              ),
             ),
-          ),
-          // Events
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Upcoming Events',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 140,
-                  child: ListView(
-                    scrollDirection: Axis.horizontal,
-                    children: [
-                      _buildEventCard('Krishna Janmashtami', 'Aug 26', AppTheme.primaryColor),
-                      _buildEventCard('Ganesh Chaturthi', 'Sept 7', AppTheme.accentGold),
-                      _buildEventCard('Navaratri', 'Oct 3', AppTheme.accentRed),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
@@ -265,7 +343,40 @@ class HomeTab extends StatelessWidget {
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(time),
-        trailing: Icon(Icons.check_circle, color: AppTheme.successColor.withValues(alpha: 0.5)),
+      ),
+    );
+  }
+
+  Widget _buildAnnouncementCard(String title, String message) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.warningColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.campaign, color: AppTheme.warningColor),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                if (message.isNotEmpty)
+                  Text(
+                    message,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -308,90 +419,121 @@ class HomeTab extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildEmptyState(String message, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(icon, size: 48, color: Colors.grey[400]),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              style: TextStyle(color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class PoojasTab extends StatelessWidget {
-  const PoojasTab({super.key});
+  final List<Map<String, dynamic>> poojas;
+  final bool isLoading;
+
+  const PoojasTab({
+    super.key,
+    required this.poojas,
+    required this.isLoading,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final poojas = [
-      {'name': 'Suprabhatha Seva', 'timing': '5:00 AM - 6:00 AM', 'price': '₹100'},
-      {'name': 'Thomtha Seva', 'timing': '6:00 AM - 7:00 AM', 'price': '₹150'},
-      {'name': 'Sankalpam', 'timing': '7:00 AM - 8:00 AM', 'price': '₹200'},
-      {'name': 'Archana', 'timing': '8:00 AM - 12:00 PM', 'price': '₹50'},
-      {'name': 'Abhishekam', 'timing': '6:00 PM - 7:00 PM', 'price': '₹500'},
-    ];
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    return Scaffold(
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: poojas.length,
-        itemBuilder: (context, index) {
-          final pooja = poojas[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryLight.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.auto_awesome, color: AppTheme.primaryColor),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              pooja['name']!,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              pooja['timing']!,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Text(
-                        pooja['price']!,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pushNamed(context, '/pooja-booking', arguments: pooja),
-                      child: const Text('Book Now'),
-                    ),
-                  ),
-                ],
-              ),
+    if (poojas.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.auto_awesome, size: 80, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'No poojas available',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey[600]),
             ),
-          );
-        },
-      ),
+            const SizedBox(height: 8),
+            Text(
+              'Temple admin will add poojas soon',
+              style: TextStyle(color: Colors.grey[500]),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: poojas.length,
+      itemBuilder: (context, index) {
+        final pooja = poojas[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryLight.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.auto_awesome, color: AppTheme.primaryColor),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            pooja['name'] ?? 'Pooja',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            pooja['timing'] ?? '',
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '₹${pooja['price'] ?? 0}',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pushNamed(context, '/pooja-booking', arguments: pooja),
+                    child: const Text('Book Now'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -440,18 +582,11 @@ class DarshanTab extends StatelessWidget {
                     children: [
                       Text(
                         ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][date.weekday - 1],
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: index == 0 ? Colors.white : Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: index == 0 ? Colors.white : Colors.grey[600]),
                       ),
                       Text(
                         '${date.day}',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: index == 0 ? Colors.white : Colors.black,
-                        ),
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: index == 0 ? Colors.white : Colors.black),
                       ),
                     ],
                   ),
@@ -471,12 +606,10 @@ class DarshanTab extends StatelessWidget {
               child: ListTile(
                 leading: const Icon(Icons.access_time, color: AppTheme.primaryColor),
                 title: Text(slot),
-                subtitle: const Text('50 people capacity'),
+                subtitle: const Text('Book your slot'),
                 trailing: ElevatedButton(
                   onPressed: () {},
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                  ),
+                  style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16)),
                   child: const Text('Book'),
                 ),
               ),
@@ -524,41 +657,29 @@ class DonationsTab extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          const Text(
-            'Custom Amount',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
+          const Text('Custom Amount', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: TextField(
-                decoration: const InputDecoration(
-                  hintText: 'Enter amount',
-                  prefixText: '₹ ',
+              Expanded(
+                child: TextField(
+                  decoration: const InputDecoration(hintText: 'Enter amount', prefixText: '₹ '),
+                  keyboardType: TextInputType.number,
                 ),
-                keyboardType: TextInputType.number,
-              )),
+              ),
               const SizedBox(width: 12),
               ElevatedButton(
                 onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                ),
+                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
                 child: const Text('Donate'),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          // Quick Amounts
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [101, 501, 1001, 5001].map((amount) =>
-              ActionChip(
-                label: Text('₹$amount'),
-                onPressed: () {},
-              ),
-            ).toList(),
+            children: [101, 501, 1001, 5001].map((amount) => ActionChip(label: Text('₹$amount'), onPressed: () {})).toList(),
           ),
         ],
       ),
@@ -577,16 +698,8 @@ class DonationsTab extends StatelessWidget {
             children: [
               Icon(icon, size: 32, color: color),
               const SizedBox(height: 8),
-              Text(
-                title,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-              ),
-              Text(
-                subtitle,
-                style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                textAlign: TextAlign.center,
-              ),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+              Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey[600]), textAlign: TextAlign.center),
             ],
           ),
         ),
@@ -604,7 +717,6 @@ class ProfileTab extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // Profile Header
           Consumer<AuthProvider>(
             builder: (context, auth, child) {
               return Card(
@@ -616,35 +728,21 @@ class ProfileTab extends StatelessWidget {
                         radius: 50,
                         backgroundColor: AppTheme.primaryColor,
                         child: Text(
-                          auth.currentUser?.name.isNotEmpty == true
-                              ? auth.currentUser!.name[0].toUpperCase()
+                          (auth.currentUser?.displayName?.isNotEmpty ?? false)
+                              ? auth.currentUser!.displayName![0].toUpperCase()
                               : 'U',
-                          style: const TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        auth.currentUser?.name ?? 'User',
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        auth.currentUser?.displayName ?? 'User',
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        auth.currentUser?.email ?? '',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
+                      Text(auth.currentUser?.email ?? '', style: TextStyle(color: Colors.grey[600])),
                       const SizedBox(height: 16),
-                      OutlinedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Edit Profile'),
-                      ),
+                      OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.edit), label: const Text('Edit Profile')),
                     ],
                   ),
                 ),
@@ -652,7 +750,6 @@ class ProfileTab extends StatelessWidget {
             },
           ),
           const SizedBox(height: 16),
-          // Menu Items
           Card(
             child: Column(
               children: [
@@ -662,8 +759,6 @@ class ProfileTab extends StatelessWidget {
                 const Divider(height: 1),
                 _buildMenuItem(Icons.favorite, 'My Donations', () {}),
                 const Divider(height: 1),
-                _buildMenuItem(Icons.brightness_6, 'Theme', () {}),
-                const Divider(height: 1),
                 _buildMenuItem(Icons.help, 'Help & Support', () {}),
                 const Divider(height: 1),
                 _buildMenuItem(Icons.info, 'About', () {}),
@@ -671,7 +766,6 @@ class ProfileTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          // Logout Button
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -684,10 +778,7 @@ class ProfileTab extends StatelessWidget {
               },
               icon: const Icon(Icons.logout),
               label: const Text('Logout'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.errorColor,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor, padding: const EdgeInsets.symmetric(vertical: 12)),
             ),
           ),
           const SizedBox(height: 20),

@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+        request.auth.token.email == 'kollivenkatsai1802@gmail.com';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // TEMPORARILY PERMISSIVE FOR TESTING - Anyone authenticated can do everything
+    // SuperAdmins collection
+    match /superAdmins/{adminId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Users collection - anyone authenticated can read and write
+    match /users/{userId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Admins collection
+    match /admins/{adminId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Temples collection
+    match /temples/{templeId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Poojas collection
+    match /poojas/{poojaId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Events collection
+    match /events/{eventId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Bookings collection
+    match /bookings/{bookingId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Donations collection
+    match /donations/{donationId} {
+      allow read, write: if isAuthenticated();
+    }
+    
+    // Announcements collection
+    match /announcements/{announcementId} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

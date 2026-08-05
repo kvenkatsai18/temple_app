@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../data/models/temple_model.dart';
+import '../../../../data/services/firebase_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../temple/presentation/providers/temple_provider.dart';
 
 class AdminHomePage extends StatefulWidget {
   const AdminHomePage({super.key});
@@ -12,113 +15,99 @@ class AdminHomePage extends StatefulWidget {
 
 class _AdminHomePageState extends State<AdminHomePage> {
   int _currentIndex = 0;
+  Map<String, dynamic> _stats = {};
+  bool _isLoading = true;
 
-  final List<Widget> _pages = [
-    const DashboardTab(),
-    const PoojasTab(),
-    const EventsTab(),
-    const DonationsTab(),
-    const UsersTab(),
-  ];
-
-  void _showSettingsDialog() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (sheetContext) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Settings',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ListTile(
-              leading: const CircleAvatar(
-                backgroundColor: AppTheme.primaryLight,
-                child: Icon(Icons.person, color: Colors.white),
-              ),
-              title: Consumer<AuthProvider>(
-                builder: (ctx, auth, child) {
-                  return Text(auth.currentUser?.name ?? 'Admin');
-                },
-              ),
-              subtitle: const Text('Administrator'),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.help_outline),
-              title: const Text('Help & Support'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                Navigator.pop(sheetContext);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: const Text('About'),
-              trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showAboutDialog();
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.logout, color: AppTheme.errorColor),
-              title: const Text(
-                'Logout',
-                style: TextStyle(color: AppTheme.errorColor),
-              ),
-              onTap: () {
-                Navigator.pop(sheetContext); // Close bottom sheet
-                final authProvider = Provider.of<AuthProvider>(context, listen: false);
-                authProvider.signOut().then((_) {
-                  if (mounted) {
-                    Navigator.of(context).pushNamedAndRemoveUntil(
-                      '/login',
-                      (route) => false,
-                    );
-                  }
-                });
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
-      ),
-    );
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
   }
 
-  void _showAboutDialog() {
+  Future<void> _loadStats() async {
+    setState(() => _isLoading = true);
+    
+    final templeProvider = Provider.of<TempleProvider>(context, listen: false);
+    final templeId = templeProvider.selectedTempleId;
+    
+    if (templeId != null) {
+      try {
+        final stats = await FirebaseService.getTempleStats(templeId);
+        if (mounted) {
+          setState(() {
+            _stats = stats;
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _showAdminTemplesDialog(BuildContext context) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final userEmail = auth.currentUser?.email;
+    
+    if (userEmail == null) return;
+    
+    final temples = await FirebaseService.getTemplesByAdminEmail(userEmail);
+    
+    if (!context.mounted) return;
+    
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Temple App'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Version: 1.0.0'),
-            SizedBox(height: 8),
-            Text('A comprehensive temple management application for devotees and administrators.'),
-          ],
+      builder: (context) => AlertDialog(
+        title: const Text('My Temples'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: temples.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(20),
+                    child: Text('No temples assigned to you yet.'),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: temples.length,
+                  itemBuilder: (context, index) {
+                    final temple = temples[index];
+                    final templeData = temple.data() as Map<String, dynamic>;
+                    final templeProvider = Provider.of<TempleProvider>(context, listen: false);
+                    final isSelected = templeProvider.selectedTempleId == temple.id;
+                    
+                    return ListTile(
+                      leading: Icon(
+                        Icons.temple_hindu,
+                        color: isSelected ? AppTheme.primaryColor : Colors.grey,
+                      ),
+                      title: Text(
+                        templeData['name'] ?? 'Unknown Temple',
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      subtitle: Text(templeData['location'] ?? ''),
+                      trailing: isSelected 
+                          ? const Icon(Icons.check_circle, color: AppTheme.primaryColor)
+                          : null,
+                      onTap: () {
+                        templeProvider.selectTemple(
+                          TempleModel.fromFirestore(temple.id, templeData),
+                        );
+                        _loadStats();
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
         ),
         actions: [
           TextButton(
@@ -134,71 +123,420 @@ class _AdminHomePageState extends State<AdminHomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Admin Portal'),
+        title: const Text('Admin Dashboard'),
+        automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
+            icon: const Icon(Icons.swap_horiz),
+            tooltip: 'My Temples',
+            onPressed: () {
+              Navigator.pushNamed(context, '/admin-temples');
+            },
           ),
           IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: _showSettingsDialog,
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadStats,
           ),
         ],
       ),
-      body: _pages[_currentIndex],
+      body: _buildBody(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
+        selectedItemColor: AppTheme.primaryColor,
+        unselectedItemColor: Colors.grey,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.auto_awesome), label: 'Poojas'),
           BottomNavigationBarItem(icon: Icon(Icons.event), label: 'Events'),
-          BottomNavigationBarItem(icon: Icon(Icons.volunteer_activism), label: 'Donations'),
-          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Users'),
+          BottomNavigationBarItem(icon: Icon(Icons.campaign), label: 'Announcements'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    switch (_currentIndex) {
+      case 0:
+        return DashboardTab(stats: _stats, isLoading: _isLoading, onRefresh: _loadStats);
+      case 1:
+        return const PoojasManageTab();
+      case 2:
+        return const EventsManageTab();
+      case 3:
+        return const AnnouncementsManageTab();
+      case 4:
+        return const ProfileTab();
+      default:
+        return const SizedBox();
+    }
+  }
+}
+
+class DashboardTab extends StatelessWidget {
+  final Map<String, dynamic> stats;
+  final bool isLoading;
+  final VoidCallback onRefresh;
+
+  const DashboardTab({
+    super.key,
+    required this.stats,
+    required this.isLoading,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: () async => onRefresh(),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Welcome Header
+            Consumer<AuthProvider>(
+              builder: (context, auth, child) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '🙏 Welcome, Admin!',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Manage your temple from here',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+
+            // Stats Grid
+            if (isLoading)
+              const Center(child: CircularProgressIndicator())
+            else
+              GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1.3,
+                children: [
+                  _buildStatCard(
+                    'Total Bookings',
+                    '${stats['totalBookings'] ?? 0}',
+                    Icons.calendar_today,
+                    AppTheme.primaryColor,
+                  ),
+                  _buildStatCard(
+                    'Total Donations',
+                    '₹${(stats['totalDonations'] ?? 0).toStringAsFixed(0)}',
+                    Icons.currency_rupee,
+                    AppTheme.successColor,
+                  ),
+                  _buildStatCard(
+                    'Active Poojas',
+                    '${stats['totalPoojas'] ?? 0}',
+                    Icons.auto_awesome,
+                    AppTheme.accentGold,
+                  ),
+                  _buildStatCard(
+                    'Upcoming Events',
+                    '${stats['totalEvents'] ?? 0}',
+                    Icons.event,
+                    AppTheme.accentRed,
+                  ),
+                ],
+              ),
+
+            const SizedBox(height: 24),
+
+            // Quick Actions
+            const Text(
+              'Quick Actions',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            GridView.count(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisCount: 2,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 2.2,
+              children: [
+                _buildActionCard(
+                  'Add Pooja',
+                  Icons.add_circle,
+                  () => Navigator.pushNamed(context, '/add-pooja'),
+                ),
+                _buildActionCard(
+                  'Add Event',
+                  Icons.event_available,
+                  () => Navigator.pushNamed(context, '/add-event'),
+                ),
+                _buildActionCard(
+                  'Announcement',
+                  Icons.campaign,
+                  () => Navigator.pushNamed(context, '/create-announcement'),
+                ),
+                _buildActionCard(
+                  'View Bookings',
+                  Icons.list_alt,
+                  () {},
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 28),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionCard(String title, IconData icon, VoidCallback onTap) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryLight.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: AppTheme.primaryColor, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class DashboardTab extends StatelessWidget {
-  const DashboardTab({super.key});
+class PoojasManageTab extends StatelessWidget {
+  const PoojasManageTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.auto_awesome, size: 80, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            const Text(
+              'Manage Poojas',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Add, edit, or remove poojas',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pushNamed(context, '/add-pooja'),
+              icon: const Icon(Icons.add),
+              label: const Text('Add New Pooja'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class EventsManageTab extends StatelessWidget {
+  const EventsManageTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.event, size: 80, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            const Text(
+              'Manage Events',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Create and manage temple events',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pushNamed(context, '/add-event'),
+              icon: const Icon(Icons.add),
+              label: const Text('Add New Event'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AnnouncementsManageTab extends StatelessWidget {
+  const AnnouncementsManageTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.campaign, size: 80, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            const Text(
+              'Manage Announcements',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Create important announcements',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => Navigator.pushNamed(context, '/create-announcement'),
+              icon: const Icon(Icons.add),
+              label: const Text('Create Announcement'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ProfileTab extends StatelessWidget {
+  const ProfileTab({super.key});
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Consumer<AuthProvider>(
             builder: (context, auth, child) {
               return Card(
-                child: Container(
-                  width: double.infinity,
+                child: Padding(
                   padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Welcome, ${auth.currentUser?.name ?? "Admin"}! 🙏',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                      CircleAvatar(
+                        radius: 50,
+                        backgroundColor: AppTheme.primaryColor,
+                        child: Text(
+                          (auth.currentUser?.displayName?.isNotEmpty ?? false)
+                              ? auth.currentUser!.displayName![0].toUpperCase()
+                              : 'A',
+                          style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 16),
                       Text(
-                        'Manage your temple operations efficiently',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.white.withValues(alpha: 0.9),
+                        auth.currentUser?.displayName ?? 'Admin',
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(auth.currentUser?.email ?? '', style: TextStyle(color: Colors.grey[600])),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'Temple Admin',
+                          style: TextStyle(
+                            color: AppTheme.primaryColor,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
@@ -207,206 +545,54 @@ class DashboardTab extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: 24),
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 1.3,
-            children: [
-              _buildStatCard('Total Users', '156', Icons.people, AppTheme.infoColor),
-              _buildStatCard("Today's Visitors", '48', Icons.visibility, AppTheme.successColor),
-              _buildStatCard('Donations', '₹12,500', Icons.volunteer_activism, AppTheme.accentGold),
-              _buildStatCard('Pooja Bookings', '23', Icons.auto_awesome, AppTheme.primaryColor),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          Builder(
-            builder: (ctx) => Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+          Card(
+            child: Column(
               children: [
-                _buildQuickAction(Icons.add_circle, 'Add Pooja', () => Navigator.pushNamed(ctx, '/add-pooja')),
-                _buildQuickAction(Icons.event_available, 'Add Event', () => Navigator.pushNamed(ctx, '/add-event')),
-                _buildQuickAction(Icons.announcement, 'Announce', () => Navigator.pushNamed(ctx, '/announcement')),
-                _buildQuickAction(Icons.people_alt, 'Add User', () {}),
+                ListTile(
+                  leading: const Icon(Icons.settings, color: AppTheme.primaryColor),
+                  title: const Text('Settings'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.help, color: AppTheme.primaryColor),
+                  title: const Text('Help & Support'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.info, color: AppTheme.primaryColor),
+                  title: const Text('About'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          const Text('Recent Activities', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          _buildActivityItem('New donation received - ₹500', '2 mins ago', Icons.volunteer_activism),
-          _buildActivityItem('Pooja booked: Suprabhatha Seva', '15 mins ago', Icons.auto_awesome),
-          _buildActivityItem('New user registered: John Doe', '1 hour ago', Icons.person_add),
-          _buildActivityItem('Event updated: Ganesh Chaturthi', '2 hours ago', Icons.edit),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32, color: color),
-            const SizedBox(height: 8),
-            Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
-            const SizedBox(height: 4),
-            Text(title, style: TextStyle(fontSize: 12, color: Colors.grey[600]), textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickAction(IconData icon, String label, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryLight.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: AppTheme.primaryColor),
-          ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActivityItem(String message, String time, IconData icon) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: AppTheme.primaryLight.withValues(alpha: 0.2),
-          child: Icon(icon, color: AppTheme.primaryColor, size: 20),
-        ),
-        title: Text(message),
-        subtitle: Text(time, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-      ),
-    );
-  }
-}
-
-class PoojasTab extends StatelessWidget {
-  const PoojasTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: 5,
-        itemBuilder: (context, index) {
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: CircleAvatar(backgroundColor: AppTheme.primaryLight, child: const Icon(Icons.auto_awesome, color: Colors.white)),
-              title: Text('Pooja ${index + 1}'),
-              subtitle: const Text('Timing: 6:00 AM - 7:00 AM'),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('₹${100 + index * 50}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(width: 8),
-                  IconButton(icon: const Icon(Icons.edit, size: 20), onPressed: () => Navigator.pushNamed(context, '/add-pooja')),
-                ],
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                final auth = Provider.of<AuthProvider>(context, listen: false);
+                await auth.signOut();
+                if (context.mounted) {
+                  Navigator.pushReplacementNamed(context, '/login');
+                }
+              },
+              icon: const Icon(Icons.logout),
+              label: const Text('Logout'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.errorColor,
+                padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
-          );
-        },
+          ),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(onPressed: () => Navigator.pushNamed(context, '/add-pooja'), child: const Icon(Icons.add)),
-    );
-  }
-}
-
-class EventsTab extends StatelessWidget {
-  const EventsTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: 5,
-        itemBuilder: (context, index) {
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: CircleAvatar(backgroundColor: AppTheme.accentGold, child: const Icon(Icons.event, color: Colors.white)),
-              title: Text('Event ${index + 1}'),
-              subtitle: const Text('Date: Aug 15, 2026'),
-              trailing: Chip(label: Text('Active')),
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(onPressed: () => Navigator.pushNamed(context, '/add-event'), child: const Icon(Icons.add)),
-    );
-  }
-}
-
-class DonationsTab extends StatelessWidget {
-  const DonationsTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: 5,
-        itemBuilder: (context, index) {
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: CircleAvatar(backgroundColor: AppTheme.successColor, child: const Icon(Icons.volunteer_activism, color: Colors.white)),
-              title: Text('Donation ${index + 1}'),
-              subtitle: Text('₹${500 + index * 100} - General Donation'),
-              trailing: Chip(label: Text('Completed')),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class UsersTab extends StatelessWidget {
-  const UsersTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: 5,
-        itemBuilder: (context, index) {
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: CircleAvatar(backgroundColor: AppTheme.infoColor, child: const Icon(Icons.person, color: Colors.white)),
-              title: Text('User ${index + 1}'),
-              subtitle: Text('user${index + 1}@example.com'),
-              trailing: Chip(label: Text('Active')),
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(onPressed: () {}, child: const Icon(Icons.person_add)),
     );
   }
 }
