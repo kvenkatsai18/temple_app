@@ -4,6 +4,10 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../data/services/firebase_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../temple/presentation/providers/temple_provider.dart';
+import 'pooja_booking_page.dart';
+import 'my_bookings_page.dart';
+import 'my_donations_page.dart';
+import 'donation_page.dart';
 
 class UserHomePage extends StatefulWidget {
   const UserHomePage({super.key});
@@ -46,6 +50,7 @@ class _UserHomePageState extends State<UserHomePage> {
           });
         }
       } catch (e) {
+        debugPrint('Error loading data: $e');
         if (mounted) {
           setState(() => _isLoading = false);
         }
@@ -83,7 +88,65 @@ class _UserHomePageState extends State<UserHomePage> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: Column(
+        children: [
+          // Temple Selection Banner
+          Consumer<TempleProvider>(
+            builder: (context, templeProvider, child) {
+              if (templeProvider.selectedTempleId == null) {
+                return Container(
+                  width: double.infinity,
+                  color: AppTheme.accentGold.withValues(alpha: 0.1),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber, color: AppTheme.accentGold),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Please select a temple to view',
+                          style: TextStyle(color: AppTheme.accentGold, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pushReplacementNamed(context, '/temple-selection'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.accentGold,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                        ),
+                        child: const Text('Select Temple'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return Container(
+                width: double.infinity,
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: AppTheme.primaryColor, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Viewing: ${templeProvider.selectedTemple?.name ?? "Unknown"}',
+                        style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pushReplacementNamed(context, '/temple-selection'),
+                      child: const Text('Change'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          Expanded(child: _buildBody()),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
@@ -144,80 +207,46 @@ class HomeTab extends StatelessWidget {
       onRefresh: () async => onRefresh(),
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Banner
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Consumer<AuthProvider>(
-                      builder: (context, auth, child) {
-                        return Text(
-                          '🙏 Jai Sri Krishna, ${auth.currentUser?.displayName ?? "Devotee"}!',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Welcome to the Divine Temple',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: () => Navigator.pushNamed(context, '/pooja-booking', arguments: {}),
-                      icon: const Icon(Icons.calendar_today, size: 16),
-                      label: const Text('Book Pooja'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppTheme.primaryColor,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
-            ),
-            
-            // Quick Actions
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Quick Actions',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            // Welcome Header
+            Consumer<AuthProvider>(
+              builder: (context, auth, child) {
+                return Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildQuickAction(Icons.auto_awesome, 'Book Pooja', () => Navigator.pushNamed(context, '/pooja-booking', arguments: {})),
-                      _buildQuickAction(Icons.visibility, 'Darshan', () => Navigator.pushNamed(context, '/darshan-booking')),
-                      _buildQuickAction(Icons.volunteer_activism, 'Donate', () => Navigator.pushNamed(context, '/donation')),
-                      _buildQuickAction(Icons.event, 'Events', () {}),
+                      Text(
+                        '🙏 Namaste!',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        auth.currentUser?.displayName ?? 'Devotee',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.white70,
+                        ),
+                      ),
                     ],
                   ),
-                ],
-              ),
+                );
+              },
             ),
+            const SizedBox(height: 20),
             
             // Today's Pooja Schedule
             Padding(
@@ -263,6 +292,35 @@ class HomeTab extends StatelessWidget {
                   ],
                 ),
               ),
+            ] else if (!isLoading) ...[
+              // Show message if no announcements
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(Icons.campaign_outlined, size: 40, color: Colors.grey[400]),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No announcements yet',
+                        style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w500),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Announcements from the temple will appear here',
+                        style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
             
             // Upcoming Events
@@ -291,7 +349,7 @@ class HomeTab extends StatelessWidget {
                           return _buildEventCard(
                             event['name'] ?? 'Event',
                             event['date'] ?? '',
-                            AppTheme.primaryColor,
+                            event['description'] ?? '',
                           );
                         },
                       ),
@@ -299,30 +357,27 @@ class HomeTab extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildQuickAction(IconData icon, String label, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
+  Widget _buildEmptyState(String message, IconData icon) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.grey.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryLight.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: AppTheme.primaryColor, size: 28),
-          ),
+          Icon(icon, size: 40, color: Colors.grey[400]),
           const SizedBox(height: 8),
           Text(
-            label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            message,
+            style: TextStyle(color: Colors.grey[600]),
           ),
         ],
       ),
@@ -336,104 +391,100 @@ class HomeTab extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: AppTheme.primaryLight.withValues(alpha: 0.2),
+            color: AppTheme.primaryColor.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, color: AppTheme.primaryColor, size: 20),
+          child: Icon(icon, color: AppTheme.primaryColor),
         ),
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(time),
+        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
       ),
     );
   }
 
   Widget _buildAnnouncementCard(String title, String message) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.warningColor.withValues(alpha: 0.1),
+        color: AppTheme.accentGold.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.campaign, color: AppTheme.warningColor),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                if (message.isNotEmpty)
-                  Text(
-                    message,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEventCard(String title, String date, Color color) {
-    return Container(
-      width: 140,
-      margin: const EdgeInsets.only(right: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [color, color.withValues(alpha: 0.7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.accentGold.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            date,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
+          Row(
+            children: [
+              Icon(Icons.campaign, color: AppTheme.accentGold, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.accentGold,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           Text(
-            title,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
+            message,
+            style: const TextStyle(color: Colors.black87),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEmptyState(String message, IconData icon) {
+  Widget _buildEventCard(String name, String date, String description) {
     return Container(
-      padding: const EdgeInsets.all(24),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(icon, size: 48, color: Colors.grey[400]),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: TextStyle(color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
-          ],
+      width: 200,
+      margin: const EdgeInsets.only(right: 12),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentRed.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.event, color: AppTheme.accentRed, size: 16),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                date,
+                style: TextStyle(color: AppTheme.accentRed, fontSize: 12),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -463,14 +514,14 @@ class PoojasTab extends StatelessWidget {
           children: [
             Icon(Icons.auto_awesome, size: 80, color: Colors.grey[400]),
             const SizedBox(height: 16),
-            Text(
-              'No poojas available',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey[600]),
+            const Text(
+              'No Poojas Available',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
-              'Temple admin will add poojas soon',
-              style: TextStyle(color: Colors.grey[500]),
+              'Pooja schedule will appear here',
+              style: TextStyle(color: Colors.grey[600]),
             ),
           ],
         ),
@@ -484,52 +535,50 @@ class PoojasTab extends StatelessWidget {
         final pooja = poojas[index];
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            leading: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.auto_awesome, color: Colors.white),
+            ),
+            title: Text(
+              pooja['name'] ?? 'Pooja',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryLight.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.auto_awesome, color: AppTheme.primaryColor),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            pooja['name'] ?? 'Pooja',
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            pooja['timing'] ?? '',
-                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      '₹${pooja['price'] ?? 0}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primaryColor),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pushNamed(context, '/pooja-booking', arguments: pooja),
-                    child: const Text('Book Now'),
+                const SizedBox(height: 4),
+                Text(pooja['timing'] ?? ''),
+                if (pooja['description'] != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    pooja['description'],
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
                   ),
-                ),
+                ],
               ],
+            ),
+            trailing: ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PoojaBookingPage(pooja: pooja),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryColor,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Book'),
             ),
           ),
         );
@@ -543,75 +592,84 @@ class DarshanTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Temple Darshan',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Book your darshan slot to avoid long queues',
-            style: TextStyle(color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            'Select Date',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 80,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: 7,
-              itemBuilder: (context, index) {
-                final date = DateTime.now().add(Duration(days: index));
-                return Container(
-                  width: 60,
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: index == 0 ? AppTheme.primaryColor : Colors.grey[200],
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][date.weekday - 1],
-                        style: TextStyle(fontSize: 12, color: index == 0 ? Colors.white : Colors.grey[600]),
+          // Live Darshan Card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.live_tv, size: 60, color: Colors.grey),
+                          SizedBox(height: 8),
+                          Text('Live Darshan', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text('Coming Soon', style: TextStyle(color: Colors.grey)),
+                        ],
                       ),
-                      Text(
-                        '${date.day}',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: index == 0 ? Colors.white : Colors.black),
-                      ),
-                    ],
+                    ),
                   ),
-                );
-              },
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {},
+                      icon: const Icon(Icons.play_arrow),
+                      label: const Text('Watch Live'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 24),
-          const Text(
-            'Available Slots',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
-          ...['5:00 AM - 6:00 AM', '7:00 AM - 12:00 PM', '5:00 PM - 6:00 PM', '7:00 PM - 8:00 PM'].map(
-            (slot) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: const Icon(Icons.access_time, color: AppTheme.primaryColor),
-                title: Text(slot),
-                subtitle: const Text('Book your slot'),
-                trailing: ElevatedButton(
-                  onPressed: () {},
-                  style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16)),
-                  child: const Text('Book'),
-                ),
+          const SizedBox(height: 16),
+          
+          // Temple Gallery
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Temple Gallery',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  GridView.count(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisCount: 2,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    children: List.generate(4, (index) {
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(Icons.image, color: Colors.grey[400]),
+                      );
+                    }),
+                  ),
+                ],
               ),
             ),
           ),
@@ -621,85 +679,228 @@ class DarshanTab extends StatelessWidget {
   }
 }
 
-class DonationsTab extends StatelessWidget {
+class DonationsTab extends StatefulWidget {
   const DonationsTab({super.key});
 
   @override
+  State<DonationsTab> createState() => _DonationsTabState();
+}
+
+class _DonationsTabState extends State<DonationsTab> {
+  List<Map<String, dynamic>> _categories = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    setState(() => _isLoading = true);
+    
+    final templeProvider = Provider.of<TempleProvider>(context, listen: false);
+    final templeId = templeProvider.selectedTempleId;
+    
+    if (templeId != null) {
+      try {
+        final docs = await FirebaseService.getDonationCategoriesByTemple(templeId);
+        if (mounted) {
+          setState(() {
+            _categories = docs.map((doc) => {
+              ...doc.data() as Map<String, dynamic>,
+              'id': doc.id,
+            }).toList();
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error loading donation categories: $e');
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Make a Donation',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Your generous donations help maintain the temple',
-            style: TextStyle(color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 24),
-          // Donation Categories
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.5,
-            children: [
-              _buildDonationCard('Annadanam', 'Food donation', Icons.restaurant, AppTheme.primaryColor),
-              _buildDonationCard('Flowers', 'Temple decoration', Icons.local_florist, AppTheme.accentRed),
-              _buildDonationCard('Oil Lamps', 'Deepa Daanam', Icons.lightbulb, AppTheme.accentGold),
-              _buildDonationCard('General', 'Temple fund', Icons.volunteer_activism, AppTheme.successColor),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const Text('Custom Amount', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  decoration: const InputDecoration(hintText: 'Enter amount', prefixText: '₹ '),
-                  keyboardType: TextInputType.number,
+    return RefreshIndicator(
+      onRefresh: () async => _loadCategories(),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Donation Header
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: AppTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.volunteer_activism, size: 60, color: Colors.white),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Support Our Temple',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Your generous donations help us maintain the temple and conduct daily rituals',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Donation Options
+            const Text(
+              'Donation Categories',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_categories.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ),
-              const SizedBox(width: 12),
-              ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16)),
-                child: const Text('Donate'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [101, 501, 1001, 5001].map((amount) => ActionChip(label: Text('₹$amount'), onPressed: () {})).toList(),
-          ),
-        ],
+                child: Column(
+                  children: [
+                    Icon(Icons.volunteer_activism, size: 50, color: Colors.grey[400]),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'No Donation Categories',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Donation categories will appear here',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ..._categories.map((category) => _buildDonationCard(
+                category['name'] ?? 'Donation',
+                category['description'] ?? '',
+                category['price']?.toDouble() ?? 0,
+              )),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildDonationCard(String title, String subtitle, IconData icon, Color color) {
+  Widget _buildDonationCard(String title, String description, double price) {
+    // Use admin-set price or default amounts
+    List<double> amounts;
+    if (price > 0) {
+      amounts = [price, price * 2, price * 5];
+    } else {
+      amounts = [501.0, 1001.0, 2501.0];
+    }
+    
     return Card(
+      margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
-        onTap: () {},
+        onTap: () {
+          // Navigate to donation page with this category pre-selected
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DonationPage(donationType: title),
+            ),
+          );
+        },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, size: 32, color: color),
-              const SizedBox(height: 8),
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-              Text(subtitle, style: TextStyle(fontSize: 11, color: Colors.grey[600]), textAlign: TextAlign.center),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppTheme.accentGold.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.volunteer_activism, color: AppTheme.accentGold),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        if (description.isNotEmpty)
+                          Text(
+                            description,
+                            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        '\$${price.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: AppTheme.primaryColor,
+                        ),
+                      ),
+                      const Text(
+                        'starting from',
+                        style: TextStyle(fontSize: 10, color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      children: amounts.map((amount) {
+                        return Chip(
+                          label: Text(
+                            '\$${amount.toStringAsFixed(0)}',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          backgroundColor: AppTheme.primaryColor.withValues(alpha: 0.1),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
             ],
           ),
         ),
@@ -741,8 +942,21 @@ class ProfileTab extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(auth.currentUser?.email ?? '', style: TextStyle(color: Colors.grey[600])),
-                      const SizedBox(height: 16),
-                      OutlinedButton.icon(onPressed: () {}, icon: const Icon(Icons.edit), label: const Text('Edit Profile')),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'Devotee',
+                          style: TextStyle(
+                            color: AppTheme.primaryColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -753,15 +967,63 @@ class ProfileTab extends StatelessWidget {
           Card(
             child: Column(
               children: [
-                _buildMenuItem(Icons.history, 'Booking History', () {}),
+                ListTile(
+                  leading: const Icon(Icons.book_online, color: AppTheme.primaryColor),
+                  title: const Text('My Bookings'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MyBookingsPage()),
+                    );
+                  },
+                ),
                 const Divider(height: 1),
-                _buildMenuItem(Icons.card_membership, 'My Poojas', () {}),
+                ListTile(
+                  leading: const Icon(Icons.favorite, color: AppTheme.primaryColor),
+                  title: const Text('My Donations'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const MyDonationsPage()),
+                    );
+                  },
+                ),
                 const Divider(height: 1),
-                _buildMenuItem(Icons.favorite, 'My Donations', () {}),
+                ListTile(
+                  leading: const Icon(Icons.history, color: AppTheme.primaryColor),
+                  title: const Text('History'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.settings, color: AppTheme.primaryColor),
+                  title: const Text('Settings'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
                 const Divider(height: 1),
-                _buildMenuItem(Icons.help, 'Help & Support', () {}),
+                ListTile(
+                  leading: const Icon(Icons.help, color: AppTheme.primaryColor),
+                  title: const Text('Help & Support'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
                 const Divider(height: 1),
-                _buildMenuItem(Icons.info, 'About', () {}),
+                ListTile(
+                  leading: const Icon(Icons.info, color: AppTheme.primaryColor),
+                  title: const Text('About'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {},
+                ),
               ],
             ),
           ),
@@ -778,21 +1040,14 @@ class ProfileTab extends StatelessWidget {
               },
               icon: const Icon(Icons.logout),
               label: const Text('Logout'),
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.errorColor, padding: const EdgeInsets.symmetric(vertical: 12)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.errorColor,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
             ),
           ),
-          const SizedBox(height: 20),
         ],
       ),
-    );
-  }
-
-  Widget _buildMenuItem(IconData icon, String title, VoidCallback onTap) {
-    return ListTile(
-      leading: Icon(icon, color: AppTheme.primaryColor),
-      title: Text(title),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
     );
   }
 }

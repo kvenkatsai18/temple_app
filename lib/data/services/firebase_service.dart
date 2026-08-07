@@ -56,6 +56,7 @@ class FirebaseService {
   static CollectionReference get _bookingsRef => _firestore.collection('bookings');
   static CollectionReference get _donationsRef => _firestore.collection('donations');
   static CollectionReference get _announcementsRef => _firestore.collection('announcements');
+  static CollectionReference get _galleryRef => _firestore.collection('gallery');
 
   // User Methods
   static Future<DocumentSnapshot> getUser(String uid) async {
@@ -239,7 +240,6 @@ class FirebaseService {
   static Future<List<DocumentSnapshot>> getBookingsByTemple(String templeId) async {
     final snapshot = await _bookingsRef
         .where('templeId', isEqualTo: templeId)
-        .orderBy('createdAt', descending: true)
         .get();
     return snapshot.docs;
   }
@@ -266,7 +266,6 @@ class FirebaseService {
     final snapshot = await _donationsRef
         .where('templeId', isEqualTo: templeId)
         .where('status', isEqualTo: 'completed')
-        .orderBy('createdAt', descending: true)
         .get();
     return snapshot.docs;
   }
@@ -309,7 +308,6 @@ class FirebaseService {
     final snapshot = await _announcementsRef
         .where('templeId', isEqualTo: templeId)
         .where('isActive', isEqualTo: true)
-        .orderBy('createdAt', descending: true)
         .get();
     return snapshot.docs;
   }
@@ -489,6 +487,84 @@ class FirebaseService {
     for (var temple in temples) {
       await _templesRef.add(temple);
     }
+  }
+
+  // Gallery Methods
+  static Future<String> addGalleryImage(String templeId, Map<String, dynamic> data) async {
+    final docRef = await _galleryRef.add({
+      ...data,
+      'templeId': templeId,
+      'createdAt': DateTime.now().toIso8601String(),
+    });
+    return docRef.id;
+  }
+
+  static Future<DocumentSnapshot> getGalleryImage(String imageId) async {
+    return await _galleryRef.doc(imageId).get();
+  }
+
+  static Future<void> updateGalleryImage(String imageId, Map<String, dynamic> data) async {
+    await _galleryRef.doc(imageId).update(data);
+  }
+
+  static Future<void> deleteGalleryImage(String imageId) async {
+    await _galleryRef.doc(imageId).delete();
+  }
+
+  static Future<List<DocumentSnapshot>> getGalleryByTemple(String templeId) async {
+    final snapshot = await _galleryRef
+        .where('templeId', isEqualTo: templeId)
+        .where('isActive', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .get();
+    return snapshot.docs;
+  }
+
+  // Temple Settings Methods (for Live Darshan, Timings, Info)
+  static Future<void> updateTempleSettings(String templeId, Map<String, dynamic> settings) async {
+    await _templesRef.doc(templeId).update(settings);
+  }
+
+  static Future<void> updateTempleTimings(String templeId, Map<String, dynamic> timings) async {
+    await _templesRef.doc(templeId).update({'timings': timings});
+  }
+
+  static Future<void> updateLiveDarshan(String templeId, String streamUrl) async {
+    await _templesRef.doc(templeId).update({
+      'liveStreamUrl': streamUrl,
+      'isLive': streamUrl.isNotEmpty,
+    });
+  }
+
+  // Donation Categories Methods
+  static Future<String> addDonationCategory(String templeId, Map<String, dynamic> data) async {
+    try {
+      // Store under temple subcollection for proper security rules
+      final docRef = await _templesRef.doc(templeId).collection('donationCategories').add({
+        ...data,
+        'isActive': true,
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+      return docRef.id;
+    } catch (e) {
+      print('Error adding donation category: $e');
+      rethrow;
+    }
+  }
+
+  static Future<void> updateDonationCategory(String templeId, String categoryId, Map<String, dynamic> data) async {
+    await _templesRef.doc(templeId).collection('donationCategories').doc(categoryId).update(data);
+  }
+
+  static Future<void> deleteDonationCategory(String templeId, String categoryId) async {
+    await _templesRef.doc(templeId).collection('donationCategories').doc(categoryId).delete();
+  }
+
+  static Future<List<DocumentSnapshot>> getDonationCategoriesByTemple(String templeId) async {
+    final snapshot = await _templesRef.doc(templeId).collection('donationCategories')
+        .where('isActive', isEqualTo: true)
+        .get();
+    return snapshot.docs;
   }
 
   static Future<void> seedPoojas(String templeId) async {

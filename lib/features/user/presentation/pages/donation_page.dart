@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../data/services/firebase_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../temple/presentation/providers/temple_provider.dart';
 
 class DonationPage extends StatefulWidget {
   final String? donationType;
@@ -12,14 +16,24 @@ class DonationPage extends StatefulWidget {
 
 class _DonationPageState extends State<DonationPage> {
   final TextEditingController _amountController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _messageController = TextEditingController();
   String? _selectedCategory;
   int _selectedAmount = 0;
+  bool _isLoading = true;
 
-  final List<Map<String, dynamic>> _categories = [
-    {'name': 'Annadanam', 'subtitle': 'Food donation', 'icon': Icons.restaurant, 'color': AppTheme.primaryColor},
-    {'name': 'Flowers', 'subtitle': 'Temple decoration', 'icon': Icons.local_florist, 'color': AppTheme.accentRed},
-    {'name': 'Oil Lamps', 'subtitle': 'Deepa Daanam', 'icon': Icons.lightbulb, 'color': AppTheme.accentGold},
-    {'name': 'General', 'subtitle': 'Temple fund', 'icon': Icons.volunteer_activism, 'color': AppTheme.successColor},
+  // Live categories from Firebase
+  List<Map<String, dynamic>> _categories = [];
+  
+  // Default icons for categories without custom icons
+  final List<IconData> _defaultIcons = [
+    Icons.restaurant, Icons.local_florist, Icons.lightbulb, Icons.volunteer_activism,
+    Icons.handshake, Icons.water_drop, Icons.home, Icons.medical_services,
+  ];
+  final List<Color> _categoryColors = [
+    AppTheme.primaryColor, AppTheme.accentRed, AppTheme.accentGold, AppTheme.successColor,
+    Colors.purple, Colors.blue, Colors.orange, Colors.teal,
   ];
 
   final List<int> _quickAmounts = [101, 501, 1001, 5001, 10001];
@@ -30,11 +44,39 @@ class _DonationPageState extends State<DonationPage> {
     if (widget.donationType != null) {
       _selectedCategory = widget.donationType;
     }
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    final templeProvider = Provider.of<TempleProvider>(context, listen: false);
+    final templeId = templeProvider.selectedTempleId;
+    
+    if (templeId != null) {
+      try {
+        final docs = await FirebaseService.getDonationCategoriesByTemple(templeId);
+        if (mounted) {
+          setState(() {
+            _categories = docs.map((doc) => {
+              ...doc.data() as Map<String, dynamic>,
+              'id': doc.id,
+            }).toList();
+            _isLoading = false;
+          });
+        }
+      } catch (e) {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
   void dispose() {
     _amountController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
+    _messageController.dispose();
     super.dispose();
   }
 
@@ -78,58 +120,90 @@ class _DonationPageState extends State<DonationPage> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1.5,
-              children: _categories.map((cat) {
-                final isSelected = _selectedCategory == cat['name'];
-                return Card(
-                  color: isSelected ? (cat['color'] as Color).withValues(alpha: 0.1) : null,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: BorderSide(
-                      color: isSelected ? cat['color'] as Color : Colors.transparent,
-                      width: 2,
-                    ),
-                  ),
-                  child: InkWell(
-                    onTap: () => setState(() => _selectedCategory = cat['name']),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            cat['icon'] as IconData, 
-                            size: 32, 
-                            color: cat['color'] as Color,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            cat['name'] as String,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              color: isSelected ? cat['color'] as Color : null,
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _categories.isEmpty
+                    ? Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(Icons.category_outlined, size: 48, color: Colors.grey[400]),
+                                const SizedBox(height: 12),
+                                const Text('No donation categories available'),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'The temple admin will add categories soon',
+                                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
-                            textAlign: TextAlign.center,
                           ),
-                          Text(
-                            cat['subtitle'] as String,
-                            style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                        ),
+                      )
+                    : GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 1.5,
+                        ),
+                        itemCount: _categories.length,
+                        itemBuilder: (context, index) {
+                          final cat = _categories[index];
+                          final colorIndex = index % _categoryColors.length;
+                          final color = _categoryColors[colorIndex];
+                          final icon = _defaultIcons[colorIndex];
+                          final isSelected = _selectedCategory == cat['name'];
+                          
+                          return Card(
+                            color: isSelected ? color.withValues(alpha: 0.1) : null,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: isSelected ? color : Colors.transparent,
+                                width: 2,
+                              ),
+                            ),
+                            child: InkWell(
+                              onTap: () => setState(() => _selectedCategory = cat['name']),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(icon, size: 32, color: color),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      cat['name'] ?? '',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: isSelected ? color : null,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (cat['description'] != null && cat['description'].toString().isNotEmpty)
+                                      Text(
+                                        cat['description'],
+                                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                                        textAlign: TextAlign.center,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
             const SizedBox(height: 24),
             
             // Quick Amounts
@@ -145,7 +219,7 @@ class _DonationPageState extends State<DonationPage> {
                 final isSelected = _selectedAmount == amount;
                 return ChoiceChip(
                   label: Text(
-                    '₹$amount',
+                    '\$$amount',
                     style: TextStyle(
                       color: isSelected ? Colors.white : AppTheme.primaryColor,
                       fontWeight: FontWeight.bold,
@@ -172,10 +246,10 @@ class _DonationPageState extends State<DonationPage> {
             const SizedBox(height: 8),
             TextField(
               controller: _amountController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 hintText: 'Enter amount',
-                prefixText: '₹ ',
-                border: OutlineInputBorder(),
+                prefixText: '\$ ',
+                border: const OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
               onChanged: (value) {
@@ -193,6 +267,7 @@ class _DonationPageState extends State<DonationPage> {
             ),
             const SizedBox(height: 12),
             TextField(
+              controller: _nameController,
               decoration: const InputDecoration(
                 labelText: 'Full Name',
                 border: OutlineInputBorder(),
@@ -201,6 +276,7 @@ class _DonationPageState extends State<DonationPage> {
             ),
             const SizedBox(height: 12),
             TextField(
+              controller: _phoneController,
               decoration: const InputDecoration(
                 labelText: 'Phone Number',
                 border: OutlineInputBorder(),
@@ -210,6 +286,7 @@ class _DonationPageState extends State<DonationPage> {
             ),
             const SizedBox(height: 12),
             TextField(
+              controller: _messageController,
               decoration: const InputDecoration(
                 labelText: 'Message (Optional)',
                 border: OutlineInputBorder(),
@@ -234,7 +311,7 @@ class _DonationPageState extends State<DonationPage> {
                 icon: const Icon(Icons.favorite),
                 label: Text(
                   _selectedAmount > 0 
-                      ? 'Donate ₹$_selectedAmount' 
+                      ? 'Donate \$$_selectedAmount'
                       : 'Select Amount',
                   style: const TextStyle(fontSize: 16),
                 ),
@@ -246,46 +323,75 @@ class _DonationPageState extends State<DonationPage> {
     );
   }
 
-  void _processDonation() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.favorite, color: AppTheme.successColor),
-            SizedBox(width: 8),
-            Text('Thank You!'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Donation: ₹$_selectedAmount'),
-            Text('Category: $_selectedCategory'),
-            const SizedBox(height: 8),
-            const Text(
-              'Your donation has been received. May Lord bless you! 🙏',
-              style: TextStyle(fontWeight: FontWeight.w500),
+  Future<void> _processDonation() async {
+    final templeProvider = Provider.of<TempleProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final templeId = templeProvider.selectedTempleId;
+    final userId = authProvider.currentUser?.uid;
+    
+    if (templeId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a temple first'), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // Save donation to Firebase
+    try {
+      await FirebaseService.createDonation({
+        'templeId': templeId,
+        'userId': userId ?? 'anonymous',
+        'category': _selectedCategory,
+        'amount': _selectedAmount.toDouble(),
+        'donorName': _nameController.text.trim().isEmpty ? 'Anonymous' : _nameController.text.trim(),
+        'donorPhone': _phoneController.text.trim(),
+        'message': _messageController.text.trim(),
+        'status': 'completed',
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.favorite, color: AppTheme.successColor),
+                SizedBox(width: 8),
+                Text('Thank You!'),
+              ],
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Thank you for your donation!'),
-                  backgroundColor: AppTheme.successColor,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Donation: \$$_selectedAmount'),
+                Text('Category: $_selectedCategory'),
+                const SizedBox(height: 8),
+                const Text(
+                  'Your donation has been received. May Lord bless you! 🙏',
+                  style: TextStyle(fontWeight: FontWeight.w500),
                 ),
-              );
-            },
-            child: const Text('OK'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
+                },
+                child: const Text('OK'),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 }

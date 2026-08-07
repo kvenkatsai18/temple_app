@@ -10,6 +10,9 @@ class TempleModel {
   final String? email;
   final bool isActive;
   final DateTime? createdAt;
+  final String? liveStreamUrl;
+  final bool isLive;
+  final Map<String, dynamic>? timings;
 
   TempleModel({
     required this.id,
@@ -23,6 +26,9 @@ class TempleModel {
     this.email,
     this.isActive = true,
     this.createdAt,
+    this.liveStreamUrl,
+    this.isLive = false,
+    this.timings,
   });
 
   factory TempleModel.fromFirestore(String id, Map<String, dynamic> data) {
@@ -40,6 +46,11 @@ class TempleModel {
       createdAt: data['createdAt'] != null 
           ? DateTime.tryParse(data['createdAt'].toString())
           : null,
+      liveStreamUrl: data['liveStreamUrl'],
+      isLive: data['isLive'] ?? false,
+      timings: data['timings'] != null 
+          ? Map<String, dynamic>.from(data['timings'])
+          : null,
     );
   }
 
@@ -55,6 +66,9 @@ class TempleModel {
       'email': email ?? '',
       'isActive': isActive,
       'createdAt': createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
+      'liveStreamUrl': liveStreamUrl ?? '',
+      'isLive': isLive,
+      'timings': timings ?? {},
     };
   }
 }

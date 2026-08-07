@@ -58,7 +58,7 @@ class TempleApp extends StatelessWidget {
           '/donation': (context) => const DonationPage(),
           '/add-pooja': (context) => const AddPoojaPage(),
           '/add-event': (context) => const AddEventPage(),
-          '/announcement': (context) => const CreateAnnouncementPage(),
+          '/create-announcement': (context) => const CreateAnnouncementPage(),
           '/signup': (context) => const SignUpPage(),
         },
       ),
